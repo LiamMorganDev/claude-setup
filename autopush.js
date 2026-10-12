@@ -6,7 +6,7 @@ const fs = require('fs')
 const path = require('path')
 
 const DIR = __dirname
-const git = (...args) => execFileSync('git', args, { cwd: DIR, encoding: 'utf8', windowsHide: true }).trim()
+const git = (...args) => execFileSync('git', args, { cwd: DIR, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
 
 try {
   // a mod with its own .git is someone else's (e.g. filetree): keep it out
