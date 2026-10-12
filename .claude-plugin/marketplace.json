@@ -1,0 +1,33 @@
+{
+  "name": "local-mods",
+  "owner": {
+    "name": "Liam"
+  },
+  "plugins": [
+    {
+      "name": "agent-monitor",
+      "source": "./agent-monitor",
+      "description": "Live pane of the current request: % complete, tokens and what each agent and subagent is doing, with a pixel Claude per agent dressed for its job"
+    },
+    {
+      "name": "context-meter",
+      "source": "./context-meter",
+      "description": "Context usage bar above the prompt: 1M scale, 300k marker, green under / orange over"
+    },
+    {
+      "name": "dracula-skin",
+      "source": "./dracula-skin",
+      "description": "Dracula skin for desktop and VS Code: turn dividers, tree-line tool rows with [tags], light/dark palette, and a banner at session start"
+    },
+    {
+      "name": "filetree",
+      "source": "./filetree",
+      "description": "An IDE-style file tree for Claude Code that shows what Claude is doing and where in files"
+    },
+    {
+      "name": "lockstep-guards",
+      "source": "./lockstep-guards",
+      "description": "Flags .env/.env.example drift and schema/types/Zod changes that aren't in lockstep"
+    }
+  ]
+}

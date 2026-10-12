@@ -1,0 +1,7 @@
+{
+  "name": "dracula-skin",
+  "version": "0.2.0",
+  "author": { "name": "Liam" },
+  "description": "Dracula skin for desktop and VS Code: turn dividers, tree-line tool rows with [tags], light/dark palette, and a banner at session start",
+  "types": "./types/index.d.ts"
+}
