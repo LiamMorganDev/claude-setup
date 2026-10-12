@@ -58,6 +58,8 @@ const summary = (r: Run): string | undefined => {
 }
 
 const DOING_MAX = 40
+/** How many recent actions the recap under each row keeps */
+const HISTORY = 5
 
 const clip = (s: string): string => (s.length > DOING_MAX ? `${s.slice(0, DOING_MAX - 1)}…` : s)
 
@@ -211,7 +213,11 @@ export const register: Register = on => {
   on('tool.call', async ($, e, next) => {
     const id = e.agentId ?? MAIN
     const input = e as unknown as Record<string, unknown>
-    await change($, id, a => ({ ...a, doing: describeCall(String(e.tool), input), tool: String(e.tool), isThinking: false }))
+    const doing = describeCall(String(e.tool), input)
+    await change($, id, a => ({
+      ...a, doing, tool: String(e.tool), isThinking: false,
+      history: (a.history ?? []).at(-1) === doing ? a.history : [...(a.history ?? []), doing].slice(-HISTORY),
+    }))
     const ran = await next(e)
     if (ran.deny !== undefined || ran.isError) return ran
 
@@ -335,6 +341,9 @@ export const register: Register = on => {
                 {` ${pct === undefined ? '  …' : `${String(pct).padStart(3)}%`} ${formatTokens(a.tokens).padStart(6)}`}
               </Text>
               <Text dimColor wrap="truncate-end">{`${gutter}↳ ${doing}`}</Text>
+              {(a.history ?? []).map((act, n) => (
+                <Text key={n} dimColor wrap="truncate-end">{`${gutter}  ${n + 1}. ${act}`}</Text>
+              ))}
             </Box>
           )
           if (!Svg) return <Box key={a.id}>{lines}</Box>

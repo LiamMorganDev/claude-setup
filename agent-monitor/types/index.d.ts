@@ -10,6 +10,8 @@ export type AgentRow = {
   /** Input + output + cache-write tokens, summed over the agent's model requests (cache reads left out) */
   tokens: number
   doing: string
+  /** The last few actions, oldest first, for the numbered recap (absent on rows from before 0.4.0) */
+  history?: string[]
   /** The tool it last called; picks the claude-let's prop */
   tool?: string
   /** Waiting on the model, between tool calls */

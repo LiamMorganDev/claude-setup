@@ -134,3 +134,22 @@ test('context bar fills to 500k, marks 300k and warns past it', async ($, on) =>
   expect(await ui.find({ text: /go/ })).toBeDefined()
   await ui.unmount()
 })
+
+test('each row keeps a numbered recap of its last 5 actions', async ($, on) => {
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.open', () => ({ value: { isPlaced: true as const } }))
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
+  on('tool.call', () => ({ result: {} }))
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  for (const f of ['a.ts', 'b.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts', 'f.ts']) {
+    await $.tool.call({ tool: 'Read', file_path: f } as Parameters<typeof $.tool.call>[0])
+  }
+  const ui = await $.ui.mount({
+    plugin: 'agent-monitor', surface: 'terminal', component: 'Pane', requestId: 'agent-monitor',
+    props: { bodyColumns: 44 } as never,
+  })
+  expect(await ui.find({ text: /1\. Reading b\.ts/ })).toBeDefined()
+  expect(await ui.find({ text: /5\. Reading f\.ts/ })).toBeDefined()
+  expect(await ui.find({ text: /Reading a\.ts/ })).toBeUndefined()
+  await ui.unmount()
+})
