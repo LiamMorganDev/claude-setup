@@ -1,6 +1,6 @@
 {
   "name": "git-panel",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": { "name": "Liam" },
   "description": "Git side pane: diffs of every changed file, branch ahead/behind, stage/commit/push/pull/stash, and git worktree management",
   "types": "./types/index.d.ts"

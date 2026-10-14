@@ -7,6 +7,22 @@ import { baseName, dirName, EMPTY_HEAD, isBranchName, parseNumstat, parseStash, 
 const PANE = 'git-panel'
 const FETCH_MS = 5 * 60_000
 const UNTRACKED_COUNT_LIMIT = 40
+// Dracula (draculatheme.com); muted is lifted from the spec's comment colour for contrast on small text.
+const C = {
+  bg: '#282a36',
+  line: '#44475a',
+  sel: '#343746',
+  fg: '#f8f8f2',
+  muted: '#a3a8c8',
+  purple: '#bd93f9',
+  pink: '#ff79c6',
+  cyan: '#8be9fd',
+  green: '#50fa7b',
+  orange: '#ffb86c',
+  red: '#ff5555',
+  yellow: '#f1fa8c',
+}
+const CODE_COLOR: Record<string, string> = { M: C.orange, A: C.green, '?': C.green, D: C.red, R: C.cyan, C: C.cyan, T: C.orange, U: C.red }
 const view = atom({ plugin: 'git-panel', key: 'view' } as const, {
   home: '',
   focus: '',
@@ -238,49 +254,85 @@ export const register: Register = on => {
     const busy = Boolean(v.busy)
     const atHome = samePath(v.focus, v.home)
     const go = (label: string, fn: (v: View) => Promise<string | void>) => () => void act($, label, fn)
-    const tab = (t: Tab, label: string) => (
-      <Button key={`tab-${t}`} variant={v.tab === t ? 'primary' : 'secondary'} label={label} onPress={() => void set($, { tab: t, confirm: '' })} />
-    )
     const age = v.fetchedAt ? Math.max(0, Math.round(((await $.clock.now()) - v.fetchedAt) / 60_000)) : -1
     const staged = v.changes.filter(c => c.group === 'staged')
+    const behindColor = (n: number) => (n ? C.pink : C.muted)
+
+    // A filled bar: what tells one section from the next.
+    const section = (title: string, count: number | string, action?: JSX.Element) => (
+      <Box key={`sec-${title}`} flexDirection="row" justifyContent="space-between" backgroundColor={C.line} paddingX={1} marginTop={1}>
+        <Text color={C.purple} bold>
+          {title.toUpperCase()} <Text color={C.fg}>{count}</Text>
+        </Text>
+        {action ?? null}
+      </Box>
+    )
+    const chip = (key: string, label: string, color: string, onPress: () => void, extra?: string) => (
+      <Button key={key} plain onPress={onPress}>
+        <Text color={color} bold>
+          {label}
+        </Text>
+        {extra ? <Text color={C.muted}> {extra}</Text> : null}
+      </Button>
+    )
+    const tab = (t: Tab, label: string, count: number) => (
+      <Button key={`tab-${t}`} plain onPress={() => void set($, { tab: t, confirm: '' })}>
+        {v.tab === t ? (
+          <Text backgroundColor={C.purple} color={C.bg} bold>
+            {' '}
+            {label} {count}{' '}
+          </Text>
+        ) : (
+          <Text color={C.muted}>
+            {' '}
+            {label} <Text color={C.fg}>{count}</Text>{' '}
+          </Text>
+        )}
+      </Button>
+    )
 
     const fileRow = (c: Change) => {
       const k = keyOf(c)
       const open = v.expanded.includes(k)
       const discardKey = `discard:${k}`
-      const color = c.code === 'D' ? 'error' : c.code === 'A' || c.code === '?' ? 'success' : c.code === 'U' ? 'error' : 'warning'
+      const letter = c.code === '?' ? 'U' : c.code
+      const toggle = () =>
+        void (async () => {
+          if (open) return set($, cur => ({ expanded: cur.expanded.filter(x => x !== k) }))
+          const diff = await diffOf($, v.focus, c)
+          await set($, cur => ({ expanded: [...cur.expanded, k], diffs: { ...cur.diffs, [k]: diff } }))
+        })()
       return (
         <Box key={k} flexDirection="column">
-          <Box flexDirection="row" gap={1}>
+          <Box flexDirection="row" gap={1} paddingX={1} backgroundColor={open ? C.sel : undefined}>
+            <Button key={`open-${k}`} plain onPress={toggle}>
+              <Text color={C.muted}>{open ? '▾' : '▸'}</Text>
+            </Button>
+            <Text color={CODE_COLOR[c.code] ?? C.orange} bold>
+              {letter}
+            </Text>
             <Box flexGrow={1} flexShrink={1}>
-              <Button
-                key={`open-${k}`}
-                plain
-                onPress={() =>
-                  void (async () => {
-                    if (open) return set($, cur => ({ expanded: cur.expanded.filter(x => x !== k) }))
-                    const diff = await diffOf($, v.focus, c)
-                    await set($, cur => ({ expanded: [...cur.expanded, k], diffs: { ...cur.diffs, [k]: diff } }))
-                  })()
-                }
-              >
-                {open ? '▾ ' : '▸ '}
-                <Text color={color} bold>{c.code === '?' ? 'U' : c.code}</Text> {baseName(c.path)} <Text dimColor>{dirName(c.path)}</Text>
+              <Button key={`name-${k}`} plain onPress={toggle}>
+                <Text color={C.fg}>{baseName(c.path)}</Text>
+                <Text color={C.muted}> {dirName(c.path)}</Text>
               </Button>
             </Box>
             <Text>
-              <Text color="success">+{c.add}</Text> <Text color="error">-{c.del}</Text>
+              <Text color={C.green}>+{c.add}</Text> <Text color={C.red}>-{c.del}</Text>
             </Text>
             {c.group === 'staged' ? (
-              <Button key={`unstage-${k}`} plain label="−" onPress={go('unstaging', async w => void (await git($, w.focus, ['restore', '--staged', '--', c.path])))} />
+              <Button key={`unstage-${k}`} plain onPress={go('unstaging', async w => void (await git($, w.focus, ['restore', '--staged', '--', c.path])))}>
+                <Text color={C.yellow} bold>−</Text>
+              </Button>
             ) : (
-              <Button key={`stage-${k}`} plain label="+" onPress={go('staging', async w => void (await git($, w.focus, ['add', '--', c.path])))} />
+              <Button key={`stage-${k}`} plain onPress={go('staging', async w => void (await git($, w.focus, ['add', '--', c.path])))}>
+                <Text color={C.green} bold>+</Text>
+              </Button>
             )}
-            {c.group !== 'staged' && (
+            {c.group !== 'staged' ? (
               <Button
                 key={`discard-${k}`}
                 plain
-                label={v.confirm === discardKey ? 'sure?' : '↺'}
                 onPress={() =>
                   void (async () => {
                     if (!(await armed($, discardKey))) return
@@ -291,8 +343,16 @@ export const register: Register = on => {
                     })
                   })()
                 }
-              />
-            )}
+              >
+                {v.confirm === discardKey ? (
+                  <Text backgroundColor={C.red} color={C.bg} bold>
+                    {' sure? '}
+                  </Text>
+                ) : (
+                  <Text color={C.red}>↺</Text>
+                )}
+              </Button>
+            ) : null}
           </Box>
           {open && v.diffs[k] ? <Code source={v.diffs[k]} format="diff" path={c.path} /> : null}
         </Box>
@@ -301,46 +361,49 @@ export const register: Register = on => {
 
     const group = (title: string, list: Change[], action: JSX.Element) =>
       list.length ? (
-        <Box key={`g-${title}`} flexDirection="column" marginTop={1}>
-          <Box flexDirection="row" justifyContent="space-between">
-            <Text dimColor bold>
-              {title.toUpperCase()} {list.length}
-            </Text>
-            {action}
-          </Box>
+        <Box key={`g-${title}`} flexDirection="column">
+          {section(title, list.length, action)}
           {list.map(fileRow)}
         </Box>
       ) : null
 
     const changesTab = () => {
-      if (!v.changes.length) return <Text dimColor>Working tree clean. Nothing to commit.</Text>
+      if (!v.changes.length) return <Text color={C.muted}>{'\n'}  Working tree clean. Nothing to commit.</Text>
       const unstaged = v.changes.filter(c => c.group === 'unstaged')
       const untracked = v.changes.filter(c => c.group === 'untracked')
       return (
         <Box flexDirection="column">
-          {group('Staged', staged, <Button key="unstage-all" plain dimColor label="unstage all" onPress={go('unstaging', async w => void (await git($, w.focus, ['reset', '-q'])))} />)}
-          {group('Changes', unstaged, <Button key="stage-all" plain dimColor label="stage all" onPress={go('staging', async w => void (await git($, w.focus, ['add', '-u'])))} />)}
+          {group('Staged', staged, chip('unstage-all', 'unstage all', C.yellow, go('unstaging', async w => void (await git($, w.focus, ['reset', '-q'])))))}
+          {group('Changes', unstaged, chip('stage-all', 'stage all', C.green, go('staging', async w => void (await git($, w.focus, ['add', '-u'])))))}
           {group(
             'Untracked',
             untracked,
-            <Button key="stage-untracked" plain dimColor label="stage all" onPress={go('staging', async w => void (await git($, w.focus, ['add', '--', ...untracked.map(c => c.path)])))} />,
+            chip('stage-untracked', 'stage all', C.green, go('staging', async w => void (await git($, w.focus, ['add', '--', ...untracked.map(c => c.path)])))),
           )}
-          <Box flexDirection="column" marginTop={1}>
+          {section('Commit', `${staged.length} staged`)}
+          <Box flexDirection="column" paddingX={1} gap={1} marginTop={1}>
             <Input
               key="msg"
-              label={`commit (${staged.length} staged) `}
-              placeholder="message"
+              placeholder="commit message"
               submitLabel="commit"
               value={v.msg}
               onInput={(text: string) => void set($, { msg: text })}
               onSubmit={(text: string) => void commit($, text)}
             />
-            <Box flexDirection="row" gap={1} flexWrap="wrap">
-              <Button key="commit" variant="primary" label={`Commit ${staged.length}`} onPress={() => void commit($, v.msg)} />
+            <Box flexDirection="row" gap={2} flexWrap="wrap">
+              <Button key="commit" plain onPress={() => void commit($, v.msg)}>
+                <Text backgroundColor={staged.length ? C.green : C.line} color={staged.length ? C.bg : C.muted} bold>
+                  {` ✓ Commit ${staged.length} `}
+                </Text>
+              </Button>
               {atHome ? (
-                <Button key="ask" label="Ask Claude to commit" onPress={() => void askClaude($)} />
+                <Button key="ask" plain onPress={() => void askClaude($)}>
+                  <Text color={C.purple} bold>
+                    ✦ Ask Claude to commit
+                  </Text>
+                </Button>
               ) : (
-                <Text dimColor>Ask Claude is off: not this session's folder.</Text>
+                <Text color={C.muted}>Ask Claude: only in this session's folder</Text>
               )}
             </Box>
           </Box>
@@ -350,6 +413,7 @@ export const register: Register = on => {
 
     const worktreesTab = () => (
       <Box flexDirection="column">
+        {section('Worktrees', v.worktrees.length)}
         {v.worktrees.map(w => {
           const isFocus = samePath(w.path, v.focus)
           const isHome = samePath(w.path, v.home)
@@ -357,35 +421,44 @@ export const register: Register = on => {
           const merged = v.merged.includes(w.branch)
           return (
             <Box key={`wt-${w.path}`} flexDirection="column">
-              <Box flexDirection="row" gap={1}>
+              <Box flexDirection="row" gap={1} paddingX={1} backgroundColor={isFocus ? C.sel : undefined}>
                 <Box flexGrow={1} flexShrink={1}>
                   <Button key={`focus-${w.path}`} plain onPress={() => void set($, { focus: w.path, expanded: [], confirm: '' }).then(() => refresh($))}>
-                    <Text color={isFocus ? 'suggestion' : undefined}>{isFocus ? '◆ ' : '◇ '}</Text>
-                    {w.branch} {isHome ? <Text dimColor>(session)</Text> : null}{' '}
-                    <Text color={w.dirty ? 'warning' : undefined} dimColor={!w.dirty}>
-                      {w.dirty ? `●${w.dirty}` : 'clean'}
-                    </Text>{' '}
-                    <Text color="success">↑{w.ahead}</Text> <Text color={w.behind ? 'warning' : undefined} dimColor={!w.behind}>↓{w.behind}</Text>
+                    <Text color={isFocus ? C.pink : C.muted}>{isFocus ? '◆ ' : '◇ '}</Text>
+                    <Text color={C.fg} bold={isFocus}>
+                      {w.branch}
+                    </Text>
+                    {isHome ? <Text color={C.cyan}> session</Text> : null}
                   </Button>
                 </Box>
-                {!isHome && (
-                  <Button key={`rm-${w.path}`} plain label={v.confirm === rmKey ? 'cancel' : '✕'} onPress={() => void set($, { confirm: v.confirm === rmKey ? '' : rmKey, rmBranch: merged })} />
+                <Text color={w.dirty ? C.orange : C.muted}>{w.dirty ? `●${w.dirty}` : 'clean'}</Text>
+                <Text>
+                  <Text color={C.green}>↑{w.ahead}</Text> <Text color={behindColor(w.behind)}>↓{w.behind}</Text>
+                </Text>
+                {isHome ? null : (
+                  <Button key={`rm-${w.path}`} plain onPress={() => void set($, { confirm: v.confirm === rmKey ? '' : rmKey, rmBranch: merged })}>
+                    <Text color={C.red}>{v.confirm === rmKey ? 'cancel' : '✕'}</Text>
+                  </Button>
                 )}
               </Box>
-              {v.confirm === rmKey && (
-                <Box flexDirection="column" borderStyle="round" borderColor="error" paddingX={1}>
-                  <Text>
-                    Remove {w.path}
-                    {w.dirty ? <Text color="error"> — {w.dirty} uncommitted files will be lost</Text> : null}
+              {v.confirm === rmKey ? (
+                <Box flexDirection="column" borderStyle="round" borderColor={C.red} paddingX={1} marginX={1}>
+                  <Text color={C.fg}>
+                    Remove <Text bold>{w.path}</Text>
                   </Text>
+                  {w.dirty ? <Text color={C.red}>{w.dirty} uncommitted files will be lost</Text> : null}
                   {merged ? (
-                    <Button key={`rmb-${w.path}`} plain label={`${v.rmBranch ? '[x]' : '[ ]'} also delete branch ${w.branch} (merged)`} onPress={() => void set($, { rmBranch: !v.rmBranch })} />
+                    <Button key={`rmb-${w.path}`} plain onPress={() => void set($, { rmBranch: !v.rmBranch })}>
+                      <Text color={C.fg}>
+                        {v.rmBranch ? '[x]' : '[ ]'} also delete branch {w.branch} <Text color={C.muted}>(merged)</Text>
+                      </Text>
+                    </Button>
                   ) : (
-                    <Text dimColor>Branch {w.branch} is not merged, so it is kept.</Text>
+                    <Text color={C.muted}>Branch {w.branch} is not merged, so it is kept.</Text>
                   )}
                   <Button
                     key={`rmgo-${w.path}`}
-                    label="Remove worktree"
+                    plain
                     onPress={go('removing worktree', async cur => {
                       await git($, cur.home, ['worktree', 'remove', ...(w.dirty ? ['--force'] : []), w.path], { timeoutMs: 60_000 })
                       const del = merged && cur.rmBranch
@@ -393,89 +466,91 @@ export const register: Register = on => {
                       if (samePath(cur.focus, w.path)) await set($, { focus: cur.home })
                       return `Removed ${w.path}${del ? ` and deleted ${w.branch}` : ''}`
                     })}
-                  />
+                  >
+                    <Text backgroundColor={C.red} color={C.bg} bold>
+                      {' Remove worktree '}
+                    </Text>
+                  </Button>
                 </Box>
-              )}
+              ) : null}
             </Box>
           )
         })}
-        <Box marginTop={1}>
+        {section('New worktree', '')}
+        <Box flexDirection="column" paddingX={1} marginTop={1}>
           <Input
             key="newwt"
-            label="new worktree "
             placeholder="feat/branch-name"
             submitLabel="create"
             value={v.newBranch}
             onInput={(text: string) => void set($, { newBranch: text })}
             onSubmit={(text: string) => void createWorktree($, text)}
           />
+          <Text color={C.muted}>Off the default branch into .worktrees/, copies .env* files</Text>
         </Box>
-        <Text dimColor>Branches off the default branch into .worktrees/, copies .env* files.</Text>
       </Box>
     )
 
     const stashTab = () => (
       <Box flexDirection="column">
-        {v.stash.length ? null : <Text dimColor>No stashes.</Text>}
+        {section('Stash', v.stash.length, chip('stash-push', 'stash push', C.cyan, go('stashing', async w => {
+          await git($, w.focus, ['stash', 'push', '-u', '-m', `git-panel: ${w.head.branch}`])
+          return 'Stashed all changes'
+        })))}
+        {v.stash.length ? null : <Text color={C.muted}>{'\n'}  No stashes.</Text>}
         {v.stash.map(s => (
-          <Box key={`st-${s.ref}`} flexDirection="row" gap={1}>
+          <Box key={`st-${s.ref}`} flexDirection="row" gap={1} paddingX={1}>
             <Box flexGrow={1} flexShrink={1}>
               <Text>
-                <Text color="suggestion">{s.ref}</Text> {s.message}
+                <Text color={C.cyan}>{s.ref}</Text> <Text color={C.fg}>{s.message}</Text>
               </Text>
             </Box>
-            <Button key={`pop-${s.ref}`} plain label="pop" onPress={go('popping stash', async w => void (await git($, w.focus, ['stash', 'pop', s.ref])))} />
+            {chip(`pop-${s.ref}`, 'pop', C.green, go('popping stash', async w => void (await git($, w.focus, ['stash', 'pop', s.ref]))))}
           </Box>
         ))}
-        <Box marginTop={1}>
-          <Button
-            key="stash-push"
-            label="stash push (incl. untracked)"
-            onPress={go('stashing', async w => {
-              await git($, w.focus, ['stash', 'push', '-u', '-m', `git-panel: ${v.head.branch}`])
-              return 'Stashed all changes'
-            })}
-          />
-        </Box>
       </Box>
     )
 
     return (
-      <Box flexDirection="column" paddingX={1}>
-        <Box flexDirection="row" justifyContent="space-between">
-          <Text bold>
-            <Text color="suggestion">⎇ </Text>
-            {v.head.branch || '…'}
+      <Box flexDirection="column" backgroundColor={C.bg} minHeight={Math.max(1, e.props.scroll?.bodyRows ?? 1)} paddingY={1}>
+        <Box flexDirection="column" paddingX={1}>
+          <Box flexDirection="row" justifyContent="space-between">
+            <Text bold>
+              <Text color={C.purple}>⎇ </Text>
+              <Text color={C.pink}>{v.head.branch || '…'}</Text>
+            </Text>
+            <Text bold>
+              <Text color={C.green}>↑{v.head.ahead}</Text> <Text color={behindColor(v.head.behind)}>↓{v.head.behind}</Text>
+            </Text>
+          </Box>
+          <Text color={C.muted} wrap="truncate-start">
+            {atHome ? <Text color={C.cyan}>● session</Text> : `○ ${v.focus}`} · {v.head.upstream || 'no upstream'} · fetched{' '}
+            {age < 0 ? 'never' : age === 0 ? 'just now' : `${age}m ago`}
           </Text>
-          <Text>
-            <Text color="success">↑{v.head.ahead}</Text> <Text color={v.head.behind ? 'warning' : undefined} dimColor={!v.head.behind}>↓{v.head.behind}</Text>
-          </Text>
+          <Box flexDirection="row" columnGap={2} flexWrap="wrap" marginTop={1}>
+            {chip('pull', '↓ pull', C.cyan, go('pulling', async w => void (await git($, w.focus, ['pull', '--ff-only'], { timeoutMs: 120_000 }))), String(v.head.behind))}
+            {chip(
+              'push',
+              '↑ push',
+              C.green,
+              go('pushing', async w => {
+                await git($, w.focus, w.head.upstream ? ['push'] : ['push', '-u', 'origin', 'HEAD'], { timeoutMs: 120_000 })
+                return `Pushed ${w.head.branch}`
+              }),
+              String(v.head.ahead),
+            )}
+            {chip('fetch', '⟳ fetch', C.purple, () => void fetchAll($, false))}
+            {chip('stash', '⊟ stash', C.orange, go('stashing', async w => void (await git($, w.focus, ['stash', 'push', '-u', '-m', `git-panel: ${w.head.branch}`]))))}
+            {chip('pop', '⊞ pop', C.orange, go('popping stash', async w => void (await git($, w.focus, ['stash', 'pop']))), v.stash.length ? String(v.stash.length) : '')}
+          </Box>
         </Box>
-        <Text dimColor wrap="truncate-start">
-          {atHome ? '● session' : `○ ${v.focus}`} · {v.head.upstream || 'no upstream'} · fetched {age < 0 ? 'never' : age === 0 ? 'just now' : `${age}m ago`}
-        </Text>
-        <Box flexDirection="row" gap={1} flexWrap="wrap">
-          <Button key="pull" label={`pull ↓${v.head.behind}`} onPress={go('pulling', async w => void (await git($, w.focus, ['pull', '--ff-only'], { timeoutMs: 120_000 })))} />
-          <Button
-            key="push"
-            label={`push ↑${v.head.ahead}`}
-            onPress={go('pushing', async w => {
-              const args = w.head.upstream ? ['push'] : ['push', '-u', 'origin', 'HEAD']
-              await git($, w.focus, args, { timeoutMs: 120_000 })
-              return `Pushed ${w.head.branch}`
-            })}
-          />
-          <Button key="fetch" label="fetch" onPress={() => void fetchAll($, false)} />
-          <Button key="stash" label="stash" onPress={go('stashing', async w => void (await git($, w.focus, ['stash', 'push', '-u', '-m', `git-panel: ${w.head.branch}`])))} />
-          <Button key="pop" label={`pop${v.stash.length ? ` (${v.stash.length})` : ''}`} onPress={go('popping stash', async w => void (await git($, w.focus, ['stash', 'pop'])))} />
+        <Box flexDirection="row" marginTop={1} paddingX={1}>
+          {tab('changes', 'Changes', v.changes.length)}
+          {tab('worktrees', 'Worktrees', v.worktrees.length)}
+          {tab('stash', 'Stash', v.stash.length)}
         </Box>
-        <Box flexDirection="row" gap={1} marginTop={1}>
-          {tab('changes', `Changes ${v.changes.length}`)}
-          {tab('worktrees', `Worktrees ${v.worktrees.length}`)}
-          {tab('stash', `Stash ${v.stash.length}`)}
-        </Box>
-        {busy ? <Text color="suggestion">{v.busy}…</Text> : null}
-        {!busy && v.note ? <Text color={v.isError ? 'error' : 'success'}>{v.note}</Text> : null}
+        {busy ? <Text color={C.yellow}>{`  ⋯ ${v.busy}`}</Text> : null}
+        {!busy && v.note ? <Text color={v.isError ? C.red : C.green}>{`  ${v.isError ? '✗' : '✓'} ${v.note}`}</Text> : null}
         {v.tab === 'changes' ? changesTab() : v.tab === 'worktrees' ? worktreesTab() : stashTab()}
       </Box>
     )
