@@ -1,12 +1,11 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import type { EnvDrift, Layer, Lockstep } from '../types'
+import type { Layer, Lockstep } from '../types'
 import { LAYERS, classify, envDiff, envShape, envSibling } from './lib'
 
 const EMPTY: Lockstep = { touched: [], files: [] }
 const lockstep = atom({ plugin: 'lockstep-guards', key: 'lockstep' } as const, EMPTY)
-const envDrift = atom({ plugin: 'lockstep-guards', key: 'envDrift' } as const, null as EnvDrift)
 
 const EDITORS = new Set(['Edit', 'Write', 'MultiEdit'])
 const baseName = (p: string) => p.replace(/\\/g, '/').split('/').pop() ?? p
@@ -30,7 +29,6 @@ export const register: Register = on => {
     const env = envSibling(path)
     if (env) {
       const drift = await checkEnv($, env.self, env.other)
-      await update($, envDrift, () => (drift.length ? { dir: env.dir || '.', problems: drift } : null))
       if (drift.length) {
         notes.push(
           `lockstep-guards: ${baseName(env.self)} and ${baseName(env.other)} are no longer structurally identical ` +
@@ -58,42 +56,6 @@ export const register: Register = on => {
 
     return notes.length ? { ...ran, context: [...(ran.context ?? []), ...notes] } : ran
   }).catch(($, e, next) => next(e)) // advisory only: never block a tool on our failure
-
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const state = await read($, lockstep)
-    const drift = await read($, envDrift)
-    if (e.props.hasSurvey || (state.touched.length === 0 && drift === null)) return next(e)
-
-    const { Box, Button, Text } = $.ui.resolve(e)
-    const missing = LAYERS.filter(l => !state.touched.includes(l))
-
-    return (
-      <Box flexDirection="column">
-        {state.touched.length > 0 && (
-          <Box>
-            <Text color="yellow">lockstep </Text>
-            {LAYERS.map(l => (
-              <Text color={state.touched.includes(l) ? 'green' : 'red'}>
-                {state.touched.includes(l) ? '✓' : '✗'} {l}{'  '}
-              </Text>
-            ))}
-            <Text dimColor>needs {missing.join(', ')} </Text>
-            <Button key="lockstep-ok" label="Dismiss" onPress={() => update($, lockstep, () => EMPTY)} />
-          </Box>
-        )}
-        {drift !== null && (
-          <Box>
-            <Text color="yellow">env drift </Text>
-            <Text dimColor>
-              {drift.dir}: {drift.problems.length} issue{drift.problems.length === 1 ? '' : 's'}, e.g.{' '}
-              {drift.problems[0]}{' '}
-            </Text>
-            <Button key="env-ok" label="Dismiss" onPress={() => update($, envDrift, () => null)} />
-          </Box>
-        )}
-      </Box>
-    )
-  })
 }
 
 type Fs = { fs: { read: (p: string) => Promise<string>; exists: (p: string) => Promise<boolean> } }

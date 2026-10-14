@@ -1,6 +1,6 @@
 {
   "name": "lockstep-guards",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Flags .env/.env.example drift and schema/types/Zod changes that aren't in lockstep",
   "types": "./types/index.d.ts"
 }

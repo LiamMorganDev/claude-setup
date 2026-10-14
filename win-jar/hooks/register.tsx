@@ -33,17 +33,22 @@ export const register: Register = on => {
     return r
   })
 
-  on('tool.call', { tool: 'mcp__glanceflow__report_progress' }, async ($, e, next) => {
+  // glanceflow answers its own report_progress without calling next, so a tool.call hook
+  // beneath it never runs. The model's tool_use row is appended whatever the hook order.
+  on('session.append', { door: 'response' }, async ($, e, next) => {
     const r = await next(e)
-    const input = e as unknown as { percent?: number; summary?: string; task?: string }
-    if (r.deny !== undefined || r.isError || input.percent !== 100) return r
-    const root = (await $.session.root()).replace(/\\/g, '/')
-    const win: Win = { t: await $.clock.now(), text: input.summary || input.task || 'a step', project: root.slice(root.lastIndexOf('/') + 1) }
-    const list = addWin(await load($), win, offset())
-    await $.store.set('wins', list)
-    await update($, wins, () => list)
-    const s = summary(list, win.t, offset())
-    $.ui.toast(`🏆 Win #${s.today} today${s.streak > 1 ? ` · ${s.streak}-day streak` : ''}`)
+    for (const b of e.message.content as readonly { type: string; name?: string; input?: unknown }[]) {
+      if (b.type !== 'tool_use' || b.name !== 'mcp__glanceflow__report_progress') continue
+      const input = (b.input ?? {}) as { percent?: unknown; summary?: string; task?: string }
+      if (Number(input.percent) !== 100) continue
+      const root = (await $.session.root()).replace(/\\/g, '/')
+      const win: Win = { t: await $.clock.now(), text: input.summary || input.task || 'a step', project: root.slice(root.lastIndexOf('/') + 1) }
+      const list = addWin(await load($), win, offset())
+      await $.store.set('wins', list)
+      await update($, wins, () => list)
+      const s = summary(list, win.t, offset())
+      $.ui.toast(`🏆 Win #${s.today} today${s.streak > 1 ? ` · ${s.streak}-day streak` : ''}`)
+    }
     return r
   })
 

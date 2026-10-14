@@ -1,1 +1,1 @@
-{ "name": "win-jar", "version": "0.1.0", "author": { "name": "Liam" }, "description": "Collects every finished step from all chats into a shipped-today jar: /wins pane, streaks, a toast per win", "types": "./types/index.d.ts" }
+{ "name": "win-jar", "version": "0.1.1", "author": { "name": "Liam" }, "description": "Collects every finished step from all chats into a shipped-today jar: /wins pane, streaks, a toast per win", "types": "./types/index.d.ts" }

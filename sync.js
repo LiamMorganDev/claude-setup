@@ -1,6 +1,7 @@
-// SessionStart hook: every mod folder in local-mods gets listed in the
-// marketplace, installed at user scope and enabled. Mods from other marketplaces
-// in ALWAYS_ON get the same treatment. Silent when nothing changes.
+// SessionStart hook: every mod folder in local-mods is loaded straight from disk in
+// every session (CLAUDE_CODE_PLUGIN_DIRS, watched, so edits hot-reload everywhere) and
+// listed in the marketplace for others. Mods from other marketplaces in ALWAYS_ON are
+// installed at user scope and enabled. Silent when nothing changes.
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
@@ -19,7 +20,9 @@ const mods = fs.readdirSync(ROOT, { withFileTypes: true })
 
 // third-party mods kept on everywhere, like the local ones
 const ALWAYS_ON = ['glanceflow@claude-mods']
-const ids = [...mods.map(m => `${m.manifest.name}@local-mods`), ...ALWAYS_ON]
+// plugin-dir mods are named <name>@inline; a project's enabledPlugins could still switch one off
+const ids = [...mods.map(m => `${m.manifest.name}@inline`), ...ALWAYS_ON]
+const localIds = mods.map(m => `${m.manifest.name}@local-mods`)
 
 // 1. marketplace lists exactly the mods on disk
 const market = readJson(MARKET, { name: 'local-mods', owner: { name: 'Liam' }, plugins: [] })
@@ -28,15 +31,11 @@ if (JSON.stringify(market.plugins) !== JSON.stringify(plugins)) {
   fs.writeFileSync(MARKET, JSON.stringify({ ...market, plugins }, null, 2) + '\n')
 }
 
-// 2. install any not yet installed (newest claude binary available)
+// 2. install ALWAYS_ON mods; uninstall installed copies of local mods, which load from disk instead
 const installed = readJson(INSTALLED, { plugins: {} }).plugins
-const missing = ids.filter(id => !installed[id])
-// a local mod whose plugin.json version moved on gets updated, so edits reach every session
-const stale = mods
-  .filter(m => installed[`${m.manifest.name}@local-mods`]?.[0]?.version !== undefined
-    && installed[`${m.manifest.name}@local-mods`][0].version !== m.manifest.version)
-  .map(m => `${m.manifest.name}@local-mods`)
-if (missing.length || stale.length) {
+const missing = ALWAYS_ON.filter(id => !installed[id])
+const doubled = localIds.filter(id => installed[id])
+if (missing.length || doubled.length) {
   const appDir = path.join(process.env.APPDATA ?? '', 'Claude', 'claude-code')
   const cmp = (a, b) => a.localeCompare(b, undefined, { numeric: true })
   // Desktop's bundled binary, else the native install, else whatever is on PATH (VS Code, terminal)
@@ -52,23 +51,24 @@ if (missing.length || stale.length) {
   for (const id of missing) {
     try { execFileSync(claude, ['plugin', 'install', id, '--scope', 'user'], { stdio: 'ignore', timeout: 60000 }) } catch {}
   }
-  if (stale.length) {
-    try { execFileSync(claude, ['plugin', 'marketplace', 'update', 'local-mods'], { stdio: 'ignore', timeout: 60000 }) } catch {}
-    for (const id of stale) {
-      try { execFileSync(claude, ['plugin', 'update', id, '--scope', 'user'], { stdio: 'ignore', timeout: 60000 }) } catch {}
-    }
+  for (const id of doubled) {
+    try { execFileSync(claude, ['plugin', 'uninstall', id, '--scope', 'user'], { stdio: 'ignore', timeout: 60000 }) } catch {}
   }
 }
 
-// 3. every local mod enabled, always
+// 3. ALWAYS_ON enabled, and every local mod folder named in the env block, file-watched
+// (desktop and VS Code sessions need the WATCH flag; a terminal watches anyway)
 const settings = readJson(SETTINGS, null)
 if (settings) {
+  const before = JSON.stringify(settings)
   const enabled = settings.enabledPlugins ?? {}
-  const off = ids.filter(id => enabled[id] !== true)
-  if (off.length) {
-    for (const id of off) enabled[id] = true
-    fs.writeFileSync(SETTINGS, JSON.stringify({ ...settings, enabledPlugins: enabled }, null, 2) + '\n')
-  }
+  for (const id of ALWAYS_ON) enabled[id] = true
+  for (const id of Object.keys(enabled)) if (id.endsWith('@local-mods') || id.endsWith('@inline')) delete enabled[id]
+  const env = settings.env ?? {}
+  env.CLAUDE_CODE_PLUGIN_DIRS = mods.map(m => path.join(ROOT, m.dir)).join(path.delimiter)
+  env.CLAUDE_CODE_PLUGIN_DIR_WATCH = '1'
+  const next = { ...settings, env, enabledPlugins: enabled }
+  if (JSON.stringify(next) !== before) fs.writeFileSync(SETTINGS, JSON.stringify(next, null, 2) + '\n')
 }
 
 // 4. a project can't switch one off: settings.local.json outranks the project's
