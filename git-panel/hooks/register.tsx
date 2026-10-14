@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Change, Tab, View } from '../types'
+import type { NameProps } from './name'
 import { baseName, dirName, EMPTY_HEAD, isBranchName, parseNumstat, parseStash, parseStatus, parseWorktrees, samePath, slugOf } from './git'
 
 const PANE = 'git-panel'
@@ -34,6 +35,7 @@ const view = atom({ plugin: 'git-panel', key: 'view' } as const, {
   expanded: [],
   diffs: {},
   confirm: '',
+  menu: '',
   rmBranch: true,
   merged: [],
   msg: '',
@@ -153,7 +155,7 @@ async function fetchAll($: $, quiet: boolean) {
 async function act($: $, label: string, fn: (v: View) => Promise<string | void>) {
   const v = await read($, view)
   if (v.busy) return
-  await set($, { busy: label, confirm: '', note: '', isError: false })
+  await set($, { busy: label, confirm: '', menu: '', note: '', isError: false })
   try {
     const note = await fn(v)
     await set($, { note: note || '', isError: false })
@@ -242,9 +244,19 @@ export const register: Register = on => {
     return result
   })
 
+  on('ui.message', { requestId: PANE }, async ($, e, next) => {
+    if (typeof e.element !== 'string' || !e.element.startsWith('name:') || !e.data || typeof e.data !== 'object') return next(e)
+    const k = e.element.slice(5)
+    const data = e.data as { press?: boolean; menu?: boolean }
+    if (data.menu) await set($, v => ({ menu: v.menu === k ? '' : k, confirm: '' }))
+    else if (data.press) await toggleDiff($, k)
+    return {}
+  })
+
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
     if (e.surface === 'mobile') return next(e)
     const { Box, Text, Button, Input, Code } = $.ui.resolve(e)
+    const Client = e.surface === 'vscode' ? Box : $.ui.resolve(e).Client
     if (e.surface === 'terminal' && e.props.placement === 'inline') {
       docked = false
       void $.ui.close({ id: PANE }).catch(() => undefined)
@@ -296,54 +308,49 @@ export const register: Register = on => {
       const open = v.expanded.includes(k)
       const discardKey = `discard:${k}`
       const letter = c.code === '?' ? 'U' : c.code
-      const toggle = () =>
-        void (async () => {
-          if (open) return set($, cur => ({ expanded: cur.expanded.filter(x => x !== k) }))
-          const diff = await diffOf($, v.focus, c)
-          await set($, cur => ({ expanded: [...cur.expanded, k], diffs: { ...cur.diffs, [k]: diff } }))
-        })()
+      const menuItem = (key: string, label: string, color: string, onPress: () => void) => (
+        <Button key={`m-${key}-${k}`} plain onPress={onPress}>
+          <Text color={color}>{label}</Text>
+        </Button>
+      )
       return (
         <Box key={k} flexDirection="column">
-          <Box flexDirection="row" gap={1} paddingX={1} backgroundColor={open ? C.sel : undefined}>
-            <Button key={`open-${k}`} plain onPress={toggle}>
+          <Box flexDirection="row" gap={1} paddingX={1} backgroundColor={open || v.menu === k ? C.sel : undefined}>
+            <Button key={`open-${k}`} plain onPress={() => void toggleDiff($, k)}>
               <Text color={C.muted}>{open ? '▾' : '▸'}</Text>
             </Button>
             <Text color={CODE_COLOR[c.code] ?? C.orange} bold>
               {letter}
             </Text>
             <Box flexGrow={1} flexShrink={1}>
-              <Button key={`name-${k}`} plain onPress={toggle}>
-                <Text color={C.fg}>{baseName(c.path)}</Text>
-                <Text color={C.muted}> {dirName(c.path)}</Text>
-              </Button>
+              {e.surface === 'vscode' ? (
+                <Button key={`name-${k}`} plain onPress={() => void toggleDiff($, k)}>
+                  <Text color={C.fg}>{baseName(c.path)}</Text>
+                  <Text color={C.muted}> {dirName(c.path)}</Text>
+                </Button>
+              ) : (
+                <Client
+                  key={`name:${k}`}
+                  module="./name.tsx"
+                  flexGrow={1}
+                  props={{ name: baseName(c.path), dir: dirName(c.path), fg: C.fg, muted: C.muted, hoverBg: C.line } satisfies NameProps}
+                />
+              )}
             </Box>
             <Text>
               <Text color={C.green}>+{c.add}</Text> <Text color={C.red}>-{c.del}</Text>
             </Text>
             {c.group === 'staged' ? (
-              <Button key={`unstage-${k}`} plain onPress={go('unstaging', async w => void (await git($, w.focus, ['restore', '--staged', '--', c.path])))}>
+              <Button key={`unstage-${k}`} plain onPress={() => void unstageFile($, c)}>
                 <Text color={C.yellow} bold>−</Text>
               </Button>
             ) : (
-              <Button key={`stage-${k}`} plain onPress={go('staging', async w => void (await git($, w.focus, ['add', '--', c.path])))}>
+              <Button key={`stage-${k}`} plain onPress={() => void stageFile($, c)}>
                 <Text color={C.green} bold>+</Text>
               </Button>
             )}
             {c.group !== 'staged' ? (
-              <Button
-                key={`discard-${k}`}
-                plain
-                onPress={() =>
-                  void (async () => {
-                    if (!(await armed($, discardKey))) return
-                    await act($, 'discarding', async w => {
-                      if (c.group === 'untracked') await git($, w.focus, ['clean', '-f', '--', c.path])
-                      else await git($, w.focus, ['restore', '--', c.path])
-                      return `Discarded ${c.path}`
-                    })
-                  })()
-                }
-              >
+              <Button key={`discard-${k}`} plain onPress={() => void discardFile($, c)}>
                 {v.confirm === discardKey ? (
                   <Text backgroundColor={C.red} color={C.bg} bold>
                     {' sure? '}
@@ -354,6 +361,21 @@ export const register: Register = on => {
               </Button>
             ) : null}
           </Box>
+          {v.menu === k ? (
+            <Box flexDirection="column" borderStyle="round" borderColor={C.purple} marginX={2} paddingX={1}>
+              {menuItem('diff', open ? '▾ Hide diff' : '▸ Show diff', C.fg, () => void toggleDiff($, k))}
+              {c.group === 'staged'
+                ? menuItem('unstage', '− Unstage', C.yellow, () => void unstageFile($, c))
+                : menuItem('stage', '+ Stage', C.green, () => void stageFile($, c))}
+              {c.group !== 'staged'
+                ? menuItem('discard', v.confirm === discardKey ? '↺ Discard changes: press again to confirm' : '↺ Discard changes', C.red, () => void discardFile($, c))
+                : null}
+              {c.group === 'untracked' ? menuItem('ignore', '⊘ Add to .gitignore', C.orange, () => void ignoreFile($, c)) : null}
+              {menuItem('copy', '⧉ Copy path', C.cyan, () => void copyPath($, c, e.surface))}
+              {menuItem('ask', '✦ Ask Claude about this change', C.purple, () => void askAbout($, c))}
+              {menuItem('close', '✕ Close', C.muted, () => void set($, { menu: '', confirm: '' }))}
+            </Box>
+          ) : null}
           {open && v.diffs[k] ? <Code source={v.diffs[k]} format="diff" path={c.path} /> : null}
         </Box>
       )
@@ -571,4 +593,48 @@ async function commit($: $, message: string) {
 async function askClaude($: $) {
   await set($, { note: 'Asked Claude to commit', isError: false })
   await $.command.run({ command: 'commit' }).catch(() => $.prompt.submit({ text: 'Commit the current changes with a clear message.' }))
+}
+
+const changeOf = (v: View, k: string) => v.changes.find(c => keyOf(c) === k)
+
+async function toggleDiff($: $, k: string) {
+  const v = await read($, view)
+  const c = changeOf(v, k)
+  if (!c) return
+  if (v.expanded.includes(k)) return set($, cur => ({ expanded: cur.expanded.filter(x => x !== k), menu: '' }))
+  const diff = await diffOf($, v.focus, c)
+  await set($, cur => ({ expanded: [...cur.expanded, k], diffs: { ...cur.diffs, [k]: diff }, menu: '' }))
+}
+
+const stageFile = ($: $, c: Change) => act($, 'staging', async w => void (await git($, w.focus, ['add', '--', c.path])))
+const unstageFile = ($: $, c: Change) => act($, 'unstaging', async w => void (await git($, w.focus, ['restore', '--staged', '--', c.path])))
+
+async function discardFile($: $, c: Change) {
+  if (!(await armed($, `discard:${keyOf(c)}`))) return
+  await act($, 'discarding', async w => {
+    if (c.group === 'untracked') await git($, w.focus, ['clean', '-f', '--', c.path])
+    else await git($, w.focus, ['restore', '--', c.path])
+    return `Discarded ${c.path}`
+  })
+}
+
+async function ignoreFile($: $, c: Change) {
+  await act($, 'ignoring', async w => {
+    const file = `${w.focus}/.gitignore`
+    const cur = (await $.fs.exists(file)) ? String(await $.fs.read(file)) : ''
+    await $.fs.write(file, `${cur}${cur && !cur.endsWith('\n') ? '\n' : ''}/${c.path}\n`)
+    return `Added /${c.path} to .gitignore`
+  })
+}
+
+async function copyPath($: $, c: Change, surface: 'terminal' | 'desktop' | 'vscode') {
+  const res = await $.ui.copy({ text: c.path, surface })
+  await set($, { menu: '', note: res.isCopied ? `Copied ${c.path}` : `Could not copy (${res.reason})`, isError: !res.isCopied })
+}
+
+async function askAbout($: $, c: Change) {
+  const v = await read($, view)
+  await set($, { menu: '' })
+  const where = samePath(v.focus, v.home) ? '' : ` in the worktree at ${v.focus}`
+  await $.prompt.submit({ text: `Explain my ${c.group} change to ${c.path}${where} (git diff${c.group === 'staged' ? ' --cached' : ''} -- ${c.path}) and flag anything risky.` })
 }

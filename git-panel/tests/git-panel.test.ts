@@ -74,3 +74,45 @@ for (const surface of ['desktop', 'terminal', 'vscode'] as const) {
     expect(await drawn.find({ key: 'newwt' })).toBeDefined()
   })
 }
+
+// Fake git: one repo at D:/repo with one modified file.
+const GIT: Record<string, string> = {
+  'rev-parse': 'D:/repo\n',
+  worktree: 'worktree D:/repo\nHEAD 1\nbranch refs/heads/main\n\n',
+  status: ['# branch.head main', '# branch.ab +0 -0', '1 .M N... 100644 100644 100644 a b src/a.ts', ''].join('\0'),
+  diff: '2\t1\tsrc/a.ts\0',
+}
+
+for (const surface of ['desktop', 'terminal'] as const) {
+  test(`right-clicking a file name opens its menu on ${surface}`, async ($, on) => {
+    on('process.run', async (_$, e) => {
+      const sub = e.argv.slice(3).find(a => !a.startsWith('-')) ?? ''
+      const out = sub === 'diff' && e.argv.includes('--cached') ? '' : GIT[sub] ?? ''
+      return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    })
+    on('session.cwd', async () => ({ value: 'D:/repo' }))
+    on('command.register', async (_$, e) => ({ value: { command: e.name } }))
+    on('session.start', async () => ({ cwd: 'D:/repo' }))
+    on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+    on('clock.every', async () => ({ value: undefined }) as never)
+    on('clock.after', async () => ({ value: undefined }) as never)
+    on('clock.now', async () => ({ value: 0 }))
+    await $.session.start({ cwd: 'D:/repo', surface, isInteractive: true })
+    const drawn = await $.ui.mount({
+      plugin: 'git-panel',
+      surface,
+      component: 'Pane',
+      requestId: 'git-panel',
+      props: { title: 'Git', isFocused: false, bodyColumns: 50, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
+    })
+    const k = 'unstaged:src/a.ts'
+    for (let i = 0; i < 20 && !(await drawn.find({ key: `stage-${k}` })); i++) await drawn.redraw()
+    expect(await drawn.find({ key: `m-stage-${k}` })).toBeUndefined()
+    await drawn.pointer({ type: 'down', x: 1, y: 0, button: 'right', in: `name:${k}` })
+    expect(await drawn.find({ key: `m-stage-${k}` })).toBeDefined()
+    expect(await drawn.find({ key: `m-discard-${k}` })).toBeDefined()
+    expect(await drawn.find({ key: `m-ignore-${k}` })).toBeUndefined()
+    await drawn.press({ key: `m-close-${k}` })
+    expect(await drawn.find({ key: `m-stage-${k}` })).toBeUndefined()
+  })
+}

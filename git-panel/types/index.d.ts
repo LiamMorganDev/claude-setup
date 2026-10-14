@@ -31,6 +31,8 @@ export type View = {
   diffs: Record<string, string>
   /** armed destructive action key, e.g. discard:unstaged:src/a.ts or rm:<path> */
   confirm: string
+  /** group:path of the file whose right-click menu is open */
+  menu: string
   rmBranch: boolean
   merged: string[]
   msg: string
