@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import { compare, parseEnv } from './drift'
+import { compare, mainCheckout, parseEnv } from './drift'
 
 const EVERY_MS = 10 * 60_000
 
@@ -23,7 +23,13 @@ async function auth($: $, url: string, identity: string, password: string) {
 async function check($: $): Promise<string | undefined> {
   const root = (await $.session.root()).replace(/\\/g, '/')
   if (!(await $.fs.exists(`${root}/pb_schema.json`))) return undefined
-  const env = (await $.fs.exists(`${root}/.env`)) ? parseEnv(String(await $.fs.read(`${root}/.env`))) : {}
+  // Worktrees don't get the gitignored .env; fall back to the main checkout's.
+  let envFile = `${root}/.env`
+  if (!(await $.fs.exists(envFile)) && (await $.fs.exists(`${root}/.git`))) {
+    const main = await Promise.resolve($.fs.read(`${root}/.git`)).then(t => mainCheckout(String(t))).catch(() => undefined)
+    if (main) envFile = `${main}/.env`
+  }
+  const env = (await $.fs.exists(envFile)) ? parseEnv(String(await $.fs.read(envFile))) : {}
   const { POCKETBASE_URL: url, PB_ADMIN_EMAIL: email, PB_ADMIN_PASSWORD: pass } = env
   if (!url || !email || !pass) return 'PB ? no creds in .env'
   try {

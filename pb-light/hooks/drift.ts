@@ -44,6 +44,12 @@ export function compare(repo: Coll[], live: Coll[]): Drift {
   return d
 }
 
+// A worktree's `.git` is a file "gitdir: <main>/.git/worktrees/<name>"; returns <main>, or undefined.
+export function mainCheckout(gitFile: string): string | undefined {
+  const m = /^gitdir:\s*(.+?)[\\/]\.git[\\/]worktrees[\\/][^\\/]+\s*$/m.exec(gitFile)
+  return m?.[1]!.replace(/\\/g, '/')
+}
+
 export function parseEnv(text: string): Record<string, string> {
   const out: Record<string, string> = {}
   for (const line of text.split(/\r?\n/)) {

@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { compare, parseEnv } from './drift'
+import { compare, mainCheckout, parseEnv } from './drift'
 
 const posts = (extra: object = {}) => ({
   id: 'abc',
@@ -31,4 +31,10 @@ test('reports repo-only fields, changed rules and live-only collections', () => 
 
 test('parseEnv reads quoted values and strips comments', () => {
   expect(parseEnv('A=1\nPB_ADMIN_EMAIL="me@x.io"  # admin\n# c\nexport B=\'two\'')).toEqual({ A: '1', PB_ADMIN_EMAIL: 'me@x.io', B: 'two' })
+})
+
+test('mainCheckout finds the main repo from a worktree .git file', () => {
+  expect(mainCheckout('gitdir: D:/code/app/.git/worktrees/wt-1\n')).toBe('D:/code/app')
+  expect(mainCheckout('gitdir: D:\\code\\app\\.git\\worktrees\\wt-1')).toBe('D:/code/app')
+  expect(mainCheckout('gitdir: /repo/.git/modules/sub')).toBeUndefined()
 })
