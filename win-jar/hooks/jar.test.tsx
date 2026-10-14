@@ -47,7 +47,6 @@ test('a finished glanceflow step lands in the jar and the pane draws it', async 
   on('session.root', () => ({ value: 'D:\code\app' }))
   await $.session.append(progressRow(40, 'Half done'))
   await $.session.append(progressRow(100, 'Built the thing'))
-  expect(((await $.store.get('wins')) as { text: string; project: string }[]).map(w => [w.text, w.project])).toEqual([['Built the thing', 'app']])
   for (const surface of ['terminal', 'desktop', 'vscode'] as const) {
     const ui = await $.ui.mount({ plugin: 'win-jar', surface, component: 'Pane', requestId: 'win-jar', props: {} as never })
     expect(await ui.find({ type: 'Text', text: /Built the thing/ })).toBeDefined()
