@@ -44,13 +44,14 @@ const progressRow = (percent: number, summary: string) =>
 test('a finished glanceflow step lands in the jar and the pane draws it', async ($, on) => {
   mock.clock(on, { now })
   mock.store(on)
-  on('session.root', () => ({ value: 'D:\code\app' }))
+  on('session.root', () => ({ value: 'D:\\code\\app' }))
   await $.session.append(progressRow(40, 'Half done'))
   await $.session.append(progressRow(100, 'Built the thing'))
   for (const surface of ['terminal', 'desktop', 'vscode'] as const) {
     const ui = await $.ui.mount({ plugin: 'win-jar', surface, component: 'Pane', requestId: 'win-jar', props: {} as never })
     expect(await ui.find({ type: 'Text', text: /Built the thing/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /Half done/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /APP/ })).toBeDefined()
     await ui.unmount()
   }
 })
