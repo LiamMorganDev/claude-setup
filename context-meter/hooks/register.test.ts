@@ -28,17 +28,18 @@ test('caps at 1M', () => {
 
 test('band draws orange bar with marker on every surface', async ($, on) => {
   on('session.measure', ($, e) => ({ changed: e.changed }))
+  on('ui.render', ($, e) => $.ui.resolve(e).Box({}))
   await $.session.measure({
     context: { tokens: 412_000, window: 1_000_000, percent: 41 },
     rateLimits: [],
     changed: ['context'],
   })
-  for (const surface of ['terminal', 'desktop'] as const) {
+  for (const surface of ['terminal', 'desktop', 'vscode'] as const) {
     const ui = await $.ui.mount({
       plugin: 'context-meter',
       surface,
       component: 'AbovePrompt',
-      props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 80 },
+      props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 80 } as never,
     })
     expect(await ui.find({ type: 'Text', text: /412k\/1M/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '│' })).toBeDefined()

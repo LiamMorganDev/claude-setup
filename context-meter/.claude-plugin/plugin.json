@@ -1,1 +1,1 @@
-{ "name": "context-meter", "version": "0.2.0", "description": "Context usage bar above the prompt: 1M scale, 300k marker, green under / orange over", "author": { "name": "Liam" }, "types": "./types/index.d.ts" }
+{ "name": "context-meter", "version": "0.3.0", "description": "Status row above the prompt: model │ branch ●dirty │ PB sync light │ context bar (1M scale, 300k marker)", "author": { "name": "Liam" }, "types": "./types/index.d.ts" }

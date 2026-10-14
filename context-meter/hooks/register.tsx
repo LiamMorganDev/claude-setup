@@ -93,7 +93,10 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const sep = <Text dimColor> │ </Text>
     const m = t === null ? null : meter(t)
+    // other mods' band rows (bat-flyby) draw beneath this one instead of being dropped
+    const below = await next(e)
     return (
+      <Box flexDirection="column">
       <Box>
         {i.model ? <Text color="#bd93f9">{i.model}</Text> : null}
         {i.branch ? sep : null}
@@ -113,6 +116,8 @@ export const register: Register = on => {
         {m ? <Text color={m.color}>{m.after.full}</Text> : null}
         {m ? <Text dimColor>{m.after.empty}</Text> : null}
         {m ? <Text color={m.color}> {m.label}</Text> : null}
+      </Box>
+      {below ?? null}
       </Box>
     )
   })
