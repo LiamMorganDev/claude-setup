@@ -2,7 +2,6 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Change, Tab, View } from '../types'
-import type { NameProps } from './name'
 import { baseName, dirName, EMPTY_HEAD, isBranchName, parseNumstat, parseStash, parseStatus, parseWorktrees, samePath, slugOf } from './git'
 
 const PANE = 'git-panel'
@@ -244,19 +243,9 @@ export const register: Register = on => {
     return result
   })
 
-  on('ui.message', { requestId: PANE }, async ($, e, next) => {
-    if (typeof e.element !== 'string' || !e.element.startsWith('name:') || !e.data || typeof e.data !== 'object') return next(e)
-    const k = e.element.slice(5)
-    const data = e.data as { press?: boolean; menu?: boolean }
-    if (data.menu) await set($, v => ({ menu: v.menu === k ? '' : k, confirm: '' }))
-    else if (data.press) await toggleDiff($, k)
-    return {}
-  })
-
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
     if (e.surface === 'mobile') return next(e)
     const { Box, Text, Button, Input, Code } = $.ui.resolve(e)
-    const Client = e.surface === 'vscode' ? Box : $.ui.resolve(e).Client
     if (e.surface === 'terminal' && e.props.placement === 'inline') {
       docked = false
       void $.ui.close({ id: PANE }).catch(() => undefined)
@@ -323,19 +312,10 @@ export const register: Register = on => {
               {letter}
             </Text>
             <Box flexGrow={1} flexShrink={1}>
-              {e.surface === 'vscode' ? (
-                <Button key={`name-${k}`} plain onPress={() => void toggleDiff($, k)}>
-                  <Text color={C.fg}>{baseName(c.path)}</Text>
-                  <Text color={C.muted}> {dirName(c.path)}</Text>
-                </Button>
-              ) : (
-                <Client
-                  key={`name:${k}`}
-                  module="./name.tsx"
-                  flexGrow={1}
-                  props={{ name: baseName(c.path), dir: dirName(c.path), fg: C.fg, muted: C.muted, hoverBg: C.line } satisfies NameProps}
-                />
-              )}
+              <Button key={`name-${k}`} plain onPress={() => void set($, cur => ({ menu: cur.menu === k ? '' : k, confirm: '' }))}>
+                <Text color={C.fg}>{baseName(c.path)}</Text>
+                <Text color={C.muted}> {dirName(c.path)}</Text>
+              </Button>
             </Box>
             <Text>
               <Text color={C.green}>+{c.add}</Text> <Text color={C.red}>-{c.del}</Text>

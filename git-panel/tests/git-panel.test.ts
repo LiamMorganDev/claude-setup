@@ -83,8 +83,8 @@ const GIT: Record<string, string> = {
   diff: '2\t1\tsrc/a.ts\0',
 }
 
-for (const surface of ['desktop', 'terminal'] as const) {
-  test(`right-clicking a file name opens its menu on ${surface}`, async ($, on) => {
+for (const surface of ['desktop', 'terminal', 'vscode'] as const) {
+  test(`clicking a file name opens its actions on ${surface}`, async ($, on) => {
     on('process.run', async (_$, e) => {
       const sub = e.argv.slice(3).find(a => !a.startsWith('-')) ?? ''
       const out = sub === 'diff' && e.argv.includes('--cached') ? '' : GIT[sub] ?? ''
@@ -108,7 +108,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     const k = 'unstaged:src/a.ts'
     for (let i = 0; i < 20 && !(await drawn.find({ key: `stage-${k}` })); i++) await drawn.redraw()
     expect(await drawn.find({ key: `m-stage-${k}` })).toBeUndefined()
-    await drawn.pointer({ type: 'down', x: 1, y: 0, button: 'right', in: `name:${k}` })
+    await drawn.press({ key: `name-${k}` })
     expect(await drawn.find({ key: `m-stage-${k}` })).toBeDefined()
     expect(await drawn.find({ key: `m-discard-${k}` })).toBeDefined()
     expect(await drawn.find({ key: `m-ignore-${k}` })).toBeUndefined()
