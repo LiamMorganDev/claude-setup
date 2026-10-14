@@ -20,7 +20,7 @@ test('a successful push launches a bat across the band, then it leaves', async (
   on('ui.render', ($, e) => { const { Box } = $.ui.resolve(e); return <Box /> })
   await $.tool.call({ tool: 'Bash', command: 'git push' } as never)
   await clock.advance(70 * 5)
-  for (const surface of ['terminal', 'desktop'] as const) {
+  for (const surface of ['terminal', 'desktop', 'vscode'] as const) {
     const ui = await $.ui.mount({
       plugin: 'bat-flyby',
       surface,

@@ -30,7 +30,7 @@ test('a finished glanceflow step lands in the jar and the pane draws it', async 
   on('session.root', () => ({ value: 'D:\\code\\app' }))
   on('tool.call', () => ({ result: 'ok' }) as never)
   await $.tool.call({ tool: 'mcp__glanceflow__report_progress', task: 'Build x', percent: 100, summary: 'Built the thing' } as never)
-  for (const surface of ['terminal', 'desktop'] as const) {
+  for (const surface of ['terminal', 'desktop', 'vscode'] as const) {
     const ui = await $.ui.mount({ plugin: 'win-jar', surface, component: 'Pane', requestId: 'win-jar', props: {} as never })
     expect(await ui.find({ type: 'Text', text: /Built the thing/ })).toBeDefined()
     await ui.unmount()

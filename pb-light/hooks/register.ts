@@ -40,9 +40,27 @@ async function check($: $): Promise<string | undefined> {
   }
 }
 
+// ~/.claude/pb-light.json, { [repo root]: text }, read by statusline.js.
+async function share($: $, text: string | undefined) {
+  const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
+  if (!home) return
+  const file = `${home.replace(/\\/g, '/')}/.claude/pb-light.json`
+  const key = (await $.session.root()).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+  let map: Record<string, string> = {}
+  try {
+    if (await $.fs.exists(file)) map = JSON.parse(String(await $.fs.read(file))) as Record<string, string>
+  } catch {
+    map = {}
+  }
+  if (text) map[key] = text
+  else delete map[key]
+  await $.fs.write(file, JSON.stringify(map))
+}
+
 async function refresh($: $) {
   const text = await check($)
   $.ui.status(text)
+  await share($, text).catch(() => undefined)
   if (text?.startsWith('PB ▲') && !last.startsWith('PB ▲')) $.ui.toast(`Live PocketBase drifted from pb_schema.json. Run /pb-drift for details.`)
   last = text ?? ''
   return text
