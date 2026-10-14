@@ -1,0 +1,1 @@
+{ "name": "unshipped-nag", "version": "0.1.0", "author": { "name": "Liam" }, "description": "Toast after a turn when changes sit uncommitted for 30+ min or commits are not pushed (at most every 30 min)" }

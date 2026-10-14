@@ -7,6 +7,10 @@ export type Change = {
   group: 'staged' | 'unstaged' | 'untracked'
   add: number
   del: number
+  /** chat that last edited the file, from chat-blame ('' when unknown) */
+  who?: string
+  /** that chat is this session */
+  mine?: boolean
 }
 
 export type Worktree = { path: string; branch: string; dirty: number; ahead: number; behind: number }

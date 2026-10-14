@@ -1,0 +1,1 @@
+{ "name": "chat-blame", "version": "0.1.0", "author": { "name": "Liam" }, "description": "Records which chat (session) last edited each file, so git-panel can badge every change with the chat it came from" }

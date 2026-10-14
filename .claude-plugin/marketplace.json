@@ -10,6 +10,16 @@
       "description": "Live pane of the current request: % complete, tokens and what each agent and subagent is doing, with a pixel Claude per agent dressed for its job"
     },
     {
+      "name": "bat-flyby",
+      "source": "./bat-flyby",
+      "description": "A Dracula bat flies across the band above the prompt whenever a git push succeeds"
+    },
+    {
+      "name": "chat-blame",
+      "source": "./chat-blame",
+      "description": "Records which chat (session) last edited each file, so git-panel can badge every change with the chat it came from"
+    },
+    {
       "name": "context-meter",
       "source": "./context-meter",
       "description": "Context usage bar above the prompt: 1M scale, 300k marker, green under / orange over"
@@ -33,6 +43,21 @@
       "name": "lockstep-guards",
       "source": "./lockstep-guards",
       "description": "Flags .env/.env.example drift and schema/types/Zod changes that aren't in lockstep"
+    },
+    {
+      "name": "pb-light",
+      "source": "./pb-light",
+      "description": "Status-line light: is live PocketBase in sync with the repo pb_schema.json (read-only check)"
+    },
+    {
+      "name": "unshipped-nag",
+      "source": "./unshipped-nag",
+      "description": "Toast after a turn when changes sit uncommitted for 30+ min or commits are not pushed (at most every 30 min)"
+    },
+    {
+      "name": "win-jar",
+      "source": "./win-jar",
+      "description": "Collects every finished step from all chats into a shipped-today jar: /wins pane, streaks, a toast per win"
     }
   ]
 }

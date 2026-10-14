@@ -1,0 +1,1 @@
+{ "name": "bat-flyby", "version": "0.1.0", "author": { "name": "Liam" }, "description": "A Dracula bat flies across the band above the prompt whenever a git push succeeds", "types": "./types/index.d.ts" }

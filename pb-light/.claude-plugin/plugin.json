@@ -1,0 +1,1 @@
+{ "name": "pb-light", "version": "0.1.0", "author": { "name": "Liam" }, "description": "Status-line light: is live PocketBase in sync with the repo pb_schema.json (read-only check)" }

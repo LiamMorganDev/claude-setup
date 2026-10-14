@@ -131,6 +131,11 @@ async function refreshOnce($: $) {
         w.behind = s.head.behind
       }),
     )
+    const { blame, me } = await readBlame($)
+    for (const c of changes) {
+      const b = blame[`${focus}/${c.path}`.replace(/\\/g, '/').toLowerCase()]
+      if (b) [c.who, c.mine] = [b.l, b.s === me]
+    }
     const live = new Set(changes.map(keyOf))
     const expanded = v.expanded.filter(k => live.has(k))
     const diffs: Record<string, string> = {}
@@ -147,6 +152,18 @@ async function refreshOnce($: $) {
     })
   } catch (err) {
     await set($, { note: String((err as Error).message ?? err), isError: true })
+  }
+}
+
+// chat-blame's file: which chat last edited each file. Empty when that mod is absent.
+async function readBlame($: $): Promise<{ blame: Record<string, { s: string; l: string }>; me: string }> {
+  try {
+    const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
+    const file = `${(home ?? '').replace(/\\/g, '/')}/.claude/chat-blame.json`
+    if (!home || !(await $.fs.exists(file))) return { blame: {}, me: '' }
+    return { blame: JSON.parse(String(await $.fs.read(file))), me: await $.session.id() }
+  } catch {
+    return { blame: {}, me: '' }
   }
 }
 
@@ -337,6 +354,7 @@ export const register: Register = on => {
               <Button key={`name-${k}`} plain onPress={() => void set($, cur => ({ menu: cur.menu === k ? '' : k, confirm: '' }))}>
                 <Text color={C.fg}>{baseName(c.path)}</Text>
                 <Text color={C.muted}> {dirName(c.path)}</Text>
+                {c.who ? <Text color={c.mine ? C.cyan : C.pink}> ◈ {c.mine ? 'this chat' : c.who}</Text> : null}
               </Button>
             </Box>
             <Text>
