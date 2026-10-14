@@ -57,7 +57,8 @@ export function parseWorktrees(out: string): Worktree[] {
   for (const block of out.replace(/\r/g, '').split('\n\n')) {
     const lines = block.split('\n').filter(Boolean)
     const path = lines.find(l => l.startsWith('worktree '))?.slice(9)
-    if (!path || lines.includes('bare')) continue
+    // prunable: the folder is gone but git hasn't pruned it yet
+    if (!path || lines.includes('bare') || lines.some(l => l.startsWith('prunable'))) continue
     const ref = lines.find(l => l.startsWith('branch '))?.slice(7) ?? ''
     list.push({
       path,

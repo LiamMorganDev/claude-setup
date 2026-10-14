@@ -34,11 +34,12 @@ test('parseNumstat reads counts, renames and binary files', () => {
   expect(map.get('new.ts')).toEqual([5, 0])
 })
 
-test('parseWorktrees lists branches and skips bare repos', () => {
+test('parseWorktrees lists branches and skips bare and deleted worktrees', () => {
   const out =
     'worktree D:/code/app\nHEAD 111\nbranch refs/heads/main\n\n' +
     'worktree D:/code/app/.worktrees/feat-x\nHEAD 222\nbranch refs/heads/feat/x\n\n' +
-    'worktree D:/code/app/.worktrees/tmp\nHEAD 333\ndetached\n\nworktree D:/bare\nbare\n'
+    'worktree D:/code/app/.worktrees/tmp\nHEAD 333\ndetached\n\nworktree D:/bare\nbare\n\n' +
+    'worktree D:/code/app/.worktrees/gone\nHEAD 444\nbranch refs/heads/gone\nprunable gitdir file points to non-existent location\n'
   expect(parseWorktrees(out).map(w => `${w.branch}@${w.path}`)).toEqual([
     'main@D:/code/app',
     'feat/x@D:/code/app/.worktrees/feat-x',

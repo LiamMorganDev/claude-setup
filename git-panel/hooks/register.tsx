@@ -6,6 +6,8 @@ import { baseName, dirName, EMPTY_HEAD, isBranchName, parseNumstat, parseStash, 
 
 const PANE = 'git-panel'
 const FETCH_MS = 5 * 60_000
+// shortcut: polls instead of watching every worktree's files; fine for a handful of worktrees, watch .git dirs if it gets heavy.
+const POLL_MS = 5_000
 const UNTRACKED_COUNT_LIMIT = 40
 // Dracula (draculatheme.com); muted is lifted from the spec's comment colour for contrast on small text.
 const C = {
@@ -47,6 +49,8 @@ const view = atom({ plugin: 'git-panel', key: 'view' } as const, {
 
 type $ = EngineInterface
 let debounce: { cancel: () => void } | null = null
+let refreshing = false
+let again = false
 let docked = true
 
 const set = ($: $, patch: Partial<View> | ((v: View) => Partial<View>)) =>
@@ -81,7 +85,24 @@ async function lineCount($: $, cwd: string, path: string) {
   }
 }
 
+// One refresh at a time; a call made while one runs queues exactly one more.
 async function refresh($: $) {
+  if (refreshing) {
+    again = true
+    return
+  }
+  refreshing = true
+  try {
+    do {
+      again = false
+      await refreshOnce($)
+    } while (again)
+  } finally {
+    refreshing = false
+  }
+}
+
+async function refreshOnce($: $) {
   const v = await read($, view)
   if (!v.home) return
   try {
@@ -212,6 +233,7 @@ export const register: Register = on => {
       if (docked) await $.ui.open({ id: PANE, title: 'Git' })
       void fetchAll($, true)
       $.clock.every(FETCH_MS, () => void fetchAll($, true))
+      $.clock.every(POLL_MS, () => void read($, view).then(v => (v.busy ? undefined : refresh($))))
     })()
     return next(e)
   })
