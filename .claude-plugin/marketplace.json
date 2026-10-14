@@ -25,6 +25,11 @@
       "description": "An IDE-style file tree for Claude Code that shows what Claude is doing and where in files"
     },
     {
+      "name": "git-panel",
+      "source": "./git-panel",
+      "description": "Git side pane: diffs of every changed file, branch ahead/behind, stage/commit/push/pull/stash, and git worktree management"
+    },
+    {
       "name": "lockstep-guards",
       "source": "./lockstep-guards",
       "description": "Flags .env/.env.example drift and schema/types/Zod changes that aren't in lockstep"
