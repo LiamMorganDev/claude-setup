@@ -1,6 +1,14 @@
 {
   "name": "claudelets-agent-monitor",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Live pane of the current request: % complete, tokens and what each agent and subagent is doing, with a pixel Claude per agent dressed for its job",
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "pollSeconds": {
+      "type": "number",
+      "title": "Usage refresh (seconds)",
+      "description": "How often ctx, 5h and 7d are re-read. 5h/7d come from your account usage, so other sessions count too; 0 turns polling off",
+      "default": 10
+    }
+  }
 }
