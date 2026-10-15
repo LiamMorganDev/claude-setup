@@ -744,8 +744,8 @@ export const register: Register = (on, options) => {
     const today = dayKey(now)
     const view: HistoryView = history ?? { day: today, entries: [], isOpen: false }
     const isToday = view.day === today
-    const dayMs = view.entries.reduce((sum, h) => sum + h.ms, 0)
-    const dayTok = view.entries.reduce((sum, h) => sum + h.tokens, 0)
+    const dayMs = view.entries.reduce((sum, q) => sum + q.ms, 0)
+    const dayTok = view.entries.reduce((sum, q) => sum + q.tokens, 0)
     const historyBlock = (
       <Box flexDirection="column">
         <Text dimColor>{'─'.repeat(Math.min(cols, 48))}</Text>
@@ -762,14 +762,14 @@ export const register: Register = (on, options) => {
                 <Text dimColor wrap="truncate-end">{` ${view.entries.length} · ${formatDuration(dayMs).replace(/\d+s$/, '') || '0m'} · ${formatTokens(dayTok)}`}</Text>
               </Box>
               {view.entries.length === 0 ? <Text dimColor>No requests this day.</Text> : null}
-              {view.entries.map((h, n) => (
+              {view.entries.map((q, n) => (
                 <Box key={`h${n}`} flexDirection="column">
                   <Text wrap="truncate-end">
-                    <Text dimColor>{clockTime(h.at)}</Text>
-                    <Text color={h.outcome === 'done' ? 'success' : 'warning'}>{h.outcome === 'done' ? ' ✓ ' : h.outcome === 'stuck' ? ' ⚠ ' : ' ■ '}</Text>
-                    {h.title}
+                    <Text dimColor>{clockTime(q.at)}</Text>
+                    <Text color={q.outcome === 'done' ? 'success' : 'warning'}>{q.outcome === 'done' ? ' ✓ ' : q.outcome === 'stuck' ? ' ⚠ ' : ' ■ '}</Text>
+                    {q.title}
                   </Text>
-                  <Text dimColor wrap="truncate-end">{`        ${formatDuration(h.ms)} · ${formatTokens(h.tokens)} tok${h.files ? ` · ${h.files} file${h.files === 1 ? '' : 's'}` : ''}`}</Text>
+                  <Text dimColor wrap="truncate-end">{`        ${formatDuration(q.ms)} · ${formatTokens(q.tokens)} tok${q.files ? ` · ${q.files} file${q.files === 1 ? '' : 's'}` : ''}`}</Text>
                 </Box>
               ))}
             </Box>

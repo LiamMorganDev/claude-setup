@@ -313,7 +313,7 @@ test('toasts and chimes when Claude needs you, gets stuck or finishes a long job
 })
 
 test('paths and days', () => {
-  expect(projectPath('C:\p\hooks\a.ts', 'C:\p')).toBe('hooks/a.ts')
+  expect(projectPath(String.raw`C:\p\hooks\a.ts`, String.raw`C:\p`)).toBe('hooks/a.ts')
   expect(projectPath('/tmp/x.log', '/home/me/p')).toBe('x.log')
   expect(shiftDay('2026-03-01', -1)).toBe('2026-02-28')
   expect(dayKey(new Date(2026, 9, 16, 23, 59).getTime())).toBe('2026-10-16')
@@ -326,7 +326,7 @@ test('a finished request shows its summary and files, and lands in history', asy
   on('store.keys', () => ({ value: [...store.keys()] }))
   on('store.delete', ($, e) => { store.delete(e.key); return { value: undefined } })
   on('fs.exists', ($, e) => ({ value: !String(e.path).endsWith('new.ts') }))
-  on('session.cwd', () => ({ value: 'C:\proj' }))
+  on('session.cwd', () => ({ value: String.raw`C:\proj` }))
   on('env.get', () => ({ value: undefined }))
   on('ui.toast', () => ({ value: undefined }))
   on('ui.status', () => ({ value: undefined }))
@@ -336,8 +336,8 @@ test('a finished request shows its summary and files, and lands in history', asy
   on('turn.complete', ($, e) => ({ text: e.answer }))
 
   await $.turn.start({ text: 'port the bits', turnId: 't1' })
-  await $.tool.call({ tool: 'Write', file_path: 'C:\proj\hooks\new.ts', content: 'x' } as Parameters<typeof $.tool.call>[0])
-  await $.tool.call({ tool: 'Edit', file_path: 'C:\proj\hooks\old.ts', old_string: 'a', new_string: 'b' } as Parameters<typeof $.tool.call>[0])
+  await $.tool.call({ tool: 'Write', file_path: String.raw`C:\proj\hooks\new.ts`, content: 'x' } as Parameters<typeof $.tool.call>[0])
+  await $.tool.call({ tool: 'Edit', file_path: String.raw`C:\proj\hooks\old.ts`, old_string: 'a', new_string: 'b' } as Parameters<typeof $.tool.call>[0])
   await $.turn.complete({ answer: 'Done.', durationMs: 5_000, isAborted: false, reason: 'answer' } as Parameters<typeof $.turn.complete>[0])
 
   const saved = store.get(`history:${dayKey(Date.now())}`) as Array<{ title: string; files: number; outcome: string }>
