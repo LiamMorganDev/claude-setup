@@ -1,0 +1,57 @@
+{
+  "//": "claude-setup settings template. INSTALL.md MERGES this into ~/.claude/settings.json (never overwrites). {{HOME}} = the user's home dir with forward slashes. Keys under _optional are added only if that component was picked; _optional itself is never written.",
+  "env": {
+    "CLAUDE_CODE_PLUGIN_DIR_WATCH": "1"
+  },
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "effortLevel": "medium",
+  "tui": "fullscreen",
+  "enableWorkflows": true,
+  "agentPushNotifEnabled": true,
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "node {{HOME}}/.claude/claude-setup/sync.js", "timeout": 120 }] }
+    ]
+  },
+  "enabledPlugins": {
+    "ponytail@ponytail": true,
+    "i-have-adhd@i-have-adhd": true,
+    "glanceflow@claude-mods": true,
+    "ui-ux-pro-max@ui-ux-pro-max-skill": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-setup": { "source": { "source": "github", "repo": "LiamMorganDev/claude-setup" } },
+    "ponytail": { "source": { "source": "github", "repo": "DietrichGebert/ponytail" } },
+    "i-have-adhd": { "source": { "source": "github", "repo": "ayghri/i-have-adhd" } },
+    "claude-mods": { "source": { "source": "github", "repo": "Antreas-Strb/glanceflow" } },
+    "ui-ux-pro-max-skill": { "source": { "source": "github", "repo": "nextlevelbuilder/ui-ux-pro-max-skill" } }
+  },
+  "_optional": {
+    "statusline": {
+      "statusLine": { "type": "command", "command": "node {{HOME}}/.claude/claude-setup/statusline/statusline.js" }
+    },
+    "worktree-hook": {
+      "hooks": {
+        "PostToolUse": [
+          { "matcher": "Bash|PowerShell", "hooks": [{ "type": "command", "command": "node {{HOME}}/.claude/claude-setup/hooks/worktree-merge-reminder.js", "timeout": 15 }] }
+        ]
+      }
+    },
+    "skins": {
+      "hooks": {
+        "SessionStart": [
+          { "hooks": [{ "type": "command", "command": "bash {{HOME}}/.claude/skins/engine/activate.sh", "timeout": 10 }] }
+        ],
+        "SessionEnd": [
+          { "hooks": [{ "type": "command", "command": "bash {{HOME}}/.claude/skins/engine/deactivate.sh", "timeout": 10 }] }
+        ]
+      }
+    },
+    "windows-powershell": {
+      "env": { "CLAUDE_CODE_USE_POWERSHELL_TOOL": "1" }
+    }
+  }
+}

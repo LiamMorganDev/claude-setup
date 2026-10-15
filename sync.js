@@ -13,12 +13,15 @@ const SETTINGS = path.join(os.homedir(), '.claude', 'settings.json')
 const INSTALLED = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json')
 const readJson = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')) } catch { return fallback } }
 
-const mods = fs.readdirSync(ROOT, { withFileTypes: true })
+// per-machine opt-outs, e.g. { "skipMods": ["pb-light"] } (written by INSTALL.md, never committed)
+const skip = readJson(path.join(os.homedir(), '.claude', 'claude-setup.local.json'), {}).skipMods ?? []
+const all = fs.readdirSync(ROOT, { withFileTypes: true })
   .filter(d => d.isDirectory() && !d.name.startsWith('.'))
   .map(d => ({ dir: d.name, manifest: readJson(path.join(ROOT, d.name, '.claude-plugin', 'plugin.json'), null) }))
   .filter(m => m.manifest?.name)
+const mods = all.filter(m => !skip.includes(m.dir))
 // a mod with its own .git is someone else's (e.g. filetree): loaded, but not listed in this marketplace
-const own = mods.filter(m => !fs.existsSync(path.join(ROOT, m.dir, '.git')))
+const own = all.filter(m => !fs.existsSync(path.join(ROOT, m.dir, '.git')))
 
 // third-party mods kept on everywhere, like the local ones
 const ALWAYS_ON = []
@@ -67,7 +70,9 @@ if (settings) {
   for (const id of ALWAYS_ON) enabled[id] = true
   for (const id of Object.keys(enabled)) if (id.endsWith('@claude-setup') || id.endsWith('@local-mods') || id.endsWith('@inline')) delete enabled[id]
   const env = settings.env ?? {}
-  env.CLAUDE_CODE_PLUGIN_DIRS = mods.map(m => path.join(ROOT, m.dir)).join(path.delimiter)
+  // keep plugin dirs from outside this repo; ours are rewritten from disk
+  const others = (env.CLAUDE_CODE_PLUGIN_DIRS ?? '').split(path.delimiter).filter(d => d && !path.resolve(d).startsWith(ROOT))
+  env.CLAUDE_CODE_PLUGIN_DIRS = [...mods.map(m => path.join(ROOT, m.dir)), ...others].join(path.delimiter)
   env.CLAUDE_CODE_PLUGIN_DIR_WATCH = '1'
   const next = { ...settings, env, enabledPlugins: enabled }
   if (JSON.stringify(next) !== before) fs.writeFileSync(SETTINGS, JSON.stringify(next, null, 2) + '\n')
