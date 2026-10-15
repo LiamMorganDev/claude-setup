@@ -5,8 +5,8 @@
   },
   "plugins": [
     {
-      "name": "agent-monitor",
-      "source": "./agent-monitor",
+      "name": "claudelets-agent-monitor",
+      "source": "./claudelets-agent-monitor",
       "description": "Live pane of the current request: % complete, tokens and what each agent and subagent is doing, with a pixel Claude per agent dressed for its job"
     },
     {
