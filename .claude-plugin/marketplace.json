@@ -22,7 +22,7 @@
     {
       "name": "context-meter",
       "source": "./context-meter",
-      "description": "Status row above the prompt: model │ branch ●dirty │ PB sync light │ context bar (1M scale, 300k marker)"
+      "description": "Status row above the prompt: model │ branch ●dirty │ PB sync light"
     },
     {
       "name": "dracula-skin",
