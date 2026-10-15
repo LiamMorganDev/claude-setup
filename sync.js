@@ -1,4 +1,4 @@
-// SessionStart hook: every mod folder in local-mods is loaded straight from disk in
+// SessionStart hook: every mod folder in mods/ is loaded straight from disk in
 // every session (CLAUDE_CODE_PLUGIN_DIRS, watched, so edits hot-reload everywhere) and
 // listed in the marketplace for others. Mods from other marketplaces in ALWAYS_ON are
 // installed at user scope and enabled. Silent when nothing changes.
@@ -7,8 +7,8 @@ const path = require('path')
 const os = require('os')
 const { execFileSync } = require('child_process')
 
-const ROOT = __dirname
-const MARKET = path.join(ROOT, '.claude-plugin', 'marketplace.json')
+const ROOT = path.join(__dirname, 'mods')
+const MARKET = path.join(__dirname, '.claude-plugin', 'marketplace.json')
 const SETTINGS = path.join(os.homedir(), '.claude', 'settings.json')
 const INSTALLED = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json')
 const readJson = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')) } catch { return fallback } }
@@ -17,16 +17,18 @@ const mods = fs.readdirSync(ROOT, { withFileTypes: true })
   .filter(d => d.isDirectory() && !d.name.startsWith('.'))
   .map(d => ({ dir: d.name, manifest: readJson(path.join(ROOT, d.name, '.claude-plugin', 'plugin.json'), null) }))
   .filter(m => m.manifest?.name)
+// a mod with its own .git is someone else's (e.g. filetree): loaded, but not listed in this marketplace
+const own = mods.filter(m => !fs.existsSync(path.join(ROOT, m.dir, '.git')))
 
 // third-party mods kept on everywhere, like the local ones
 const ALWAYS_ON = []
 // plugin-dir mods are named <name>@inline; a project's enabledPlugins could still switch one off
 const ids = [...mods.map(m => `${m.manifest.name}@inline`), ...ALWAYS_ON]
-const localIds = mods.map(m => `${m.manifest.name}@local-mods`)
+const localIds = mods.map(m => `${m.manifest.name}@claude-setup`)
 
 // 1. marketplace lists exactly the mods on disk
-const market = readJson(MARKET, { name: 'local-mods', owner: { name: 'Liam' }, plugins: [] })
-const plugins = mods.map(m => ({ name: m.manifest.name, source: `./${m.dir}`, description: m.manifest.description ?? '' }))
+const market = readJson(MARKET, { name: 'claude-setup', owner: { name: 'LiamMorganDev' }, plugins: [] })
+const plugins = own.map(m => ({ name: m.manifest.name, source: `./mods/${m.dir}`, description: m.manifest.description ?? '' }))
 if (JSON.stringify(market.plugins) !== JSON.stringify(plugins)) {
   fs.writeFileSync(MARKET, JSON.stringify({ ...market, plugins }, null, 2) + '\n')
 }
@@ -63,7 +65,7 @@ if (settings) {
   const before = JSON.stringify(settings)
   const enabled = settings.enabledPlugins ?? {}
   for (const id of ALWAYS_ON) enabled[id] = true
-  for (const id of Object.keys(enabled)) if (id.endsWith('@local-mods') || id.endsWith('@inline')) delete enabled[id]
+  for (const id of Object.keys(enabled)) if (id.endsWith('@claude-setup') || id.endsWith('@local-mods') || id.endsWith('@inline')) delete enabled[id]
   const env = settings.env ?? {}
   env.CLAUDE_CODE_PLUGIN_DIRS = mods.map(m => path.join(ROOT, m.dir)).join(path.delimiter)
   env.CLAUDE_CODE_PLUGIN_DIR_WATCH = '1'

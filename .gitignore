@@ -1,5 +1,5 @@
 # third-party mod with its own repo (Kurt Buhler)
-/filetree/
+/mods/filetree/
 # engine-generated types
-*/.claude-plugin/types/
+mods/*/.claude-plugin/types/
 node_modules/
