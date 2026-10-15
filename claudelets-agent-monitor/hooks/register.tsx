@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { AgentRow, RateLimit, Run, Sample, StepStatus } from '../types'
+import type { AgentRow, HistoryEntry, HistoryView, RateLimit, Run, Sample, StepStatus, TouchedFile } from '../types'
 import { claudeletAlt, claudeletSvg, type Pose } from './claudelet'
 import { maskPrivate } from './privacy'
 
@@ -16,6 +16,8 @@ const SAMPLES = { plugin: 'claudelets-agent-monitor', key: 'limitSamples' } as c
 const ALERTED = { plugin: 'claudelets-agent-monitor', key: 'alerted' } as const
 const EXPANDED = { plugin: 'claudelets-agent-monitor', key: 'expanded' } as const
 const TICK = { plugin: 'claudelets-agent-monitor', key: 'tick' } as const
+const FILES_OPEN = { plugin: 'claudelets-agent-monitor', key: 'filesOpen' } as const
+const HISTORY = { plugin: 'claudelets-agent-monitor', key: 'history' } as const
 
 /** Read-modify-write of the run with compare-and-set, retried when another write landed first. */
 async function updateRun($: EngineInterface, fn: (r: Run) => Run): Promise<Run> {
@@ -82,7 +84,7 @@ const summary = (r: Run): string | undefined => {
 
 const DOING_MAX = 40
 /** How many recent actions the recap under each row keeps */
-const HISTORY = 5
+const RECAP = 5
 
 // Masked before clipping, so a cut can't leave half a key showing.
 const clip = (raw: string): string => {
@@ -391,9 +393,80 @@ const sign = () => {
   isStalled = false
 }
 
+/** Local day as YYYY-MM-DD */
+export const dayKey = (at: number): string => {
+  const d = new Date(at)
+
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export const shiftDay = (day: string, by: number): string => {
+  const [y, m, d] = day.split('-').map(Number)
+
+  return dayKey(new Date(y!, m! - 1, d! + by).getTime())
+}
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** "Today, 16 Oct" / "Wed, 15 Oct" */
+export const dayLabel = (day: string, today: string): string => {
+  const [y, m, d] = day.split('-').map(Number)
+  const date = new Date(y!, m! - 1, d!)
+
+  return `${day === today ? 'Today' : WEEKDAYS[date.getDay()]}, ${d} ${MONTHS[m! - 1]}`
+}
+
+export const clockTime = (at: number): string => {
+  const d = new Date(at)
+
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+const HISTORY_PREFIX = 'history:'
+const HISTORY_DAYS = 30
+
+const readDay = async ($: EngineInterface, day: string): Promise<HistoryEntry[]> => {
+  const v = await $.store.get(HISTORY_PREFIX + day)
+
+  return Array.isArray(v) ? (v as HistoryEntry[]) : []
+}
+
+/** Puts `day`'s requests in the fold-out, keeping it open or shut as it was. */
+async function showDay($: EngineInterface, day: string, isOpen?: boolean) {
+  const { value: was } = await $.state.get(HISTORY)
+  await $.state.set(HISTORY, { day, entries: await readDay($, day), isOpen: isOpen ?? was?.isOpen ?? false })
+}
+
+/** Saves a finished request under today and drops days past 30. */
+async function recordRequest($: EngineInterface, entry: HistoryEntry) {
+  const day = dayKey(entry.at)
+  await $.store.set(HISTORY_PREFIX + day, [...(await readDay($, day)), entry])
+  const oldest = shiftDay(dayKey(Date.now()), -HISTORY_DAYS)
+  for (const key of await $.store.keys()) {
+    if (key.startsWith(HISTORY_PREFIX) && key.slice(HISTORY_PREFIX.length) < oldest) await $.store.delete(key)
+  }
+  const { value: view } = await $.state.get(HISTORY)
+  if (!view || view.day === day) await showDay($, day)
+}
+
+/** A written file's path within the project, or just its name outside it. */
+export const projectPath = (file: string, cwd: string): string => {
+  const norm = (p: string) => p.replace(/\\/g, '/')
+  const f = norm(file)
+  const root = norm(cwd).replace(/\/$/, '') + '/'
+
+  return f.toLowerCase().startsWith(root.toLowerCase()) ? f.slice(root.length) : baseName(f)
+}
+
+const WRITES = new Set(['Write', 'Edit', 'NotebookEdit'])
+/** How many files the unfolded list shows before "+N more" */
+const FILES_SHOWN = 4
+
 export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     startPoller($, Number(options.pollSeconds ?? 10))
+    await showDay($, dayKey(Date.now()))
     await $.command.register({
       name: 'monitor',
       description: 'Show the live agent monitor pane (/monitor off hides it)',
@@ -442,6 +515,7 @@ export const register: Register = (on, options) => {
     $.ui.status(summary(latest))
     sign()
     await $.state.set(EXPANDED, [])
+    await $.state.set(FILES_OPEN, false)
     startTicker($)
     const { value: hidden = false } = await $.state.get(HIDDEN)
     if (!hidden) void openPane($)
@@ -500,14 +574,24 @@ export const register: Register = (on, options) => {
     const doing = describeCall(String(e.tool), input)
     await change($, id, a => ({
       ...a, doing, tool: String(e.tool), isThinking: false, isWaiting: ASKS_PERSON.has(String(e.tool)) || undefined,
-      history: (a.history ?? []).at(-1) === doing ? a.history : [...(a.history ?? []), doing].slice(-HISTORY),
+      history: (a.history ?? []).at(-1) === doing ? a.history : [...(a.history ?? []), doing].slice(-RECAP),
     }))
     sign()
     if (ASKS_PERSON.has(String(e.tool))) void alert($, 'needsYou', doing)
+    const written = WRITES.has(String(e.tool)) ? String(input.file_path ?? input.notebook_path ?? '') : ''
+    // Checked before the write lands: a Write to a missing file creates it.
+    const isNew = written !== '' && e.tool === 'Write' && !(await $.fs.exists(written).catch(() => true))
     inFlight++
     const ran = await next(e).finally(() => { inFlight--; sign() })
     await change($, id, a => (a.isWaiting ? { ...a, isWaiting: undefined } : a))
     if (ran.deny !== undefined || ran.isError) return ran
+
+    if (written) {
+      const path = projectPath(written, await $.session.cwd())
+      await updateRun($, r => (r.files ?? []).some(f => f.path === path)
+        ? r
+        : { ...r, files: [...(r.files ?? []), { path, isNew } satisfies TouchedFile] })
+    }
 
     if (e.tool === 'TodoWrite') {
       const steps = e.todos.map((t, i) => ({ key: `${i}:${t.content}`, status: t.status }))
@@ -542,6 +626,21 @@ export const register: Register = (on, options) => {
       else if (asksQuestion(e.answer)) void alert($, 'needsYou', 'answer the question in chat')
       else if (e.durationMs >= LONG_JOB_MS) void alert($, 'done', formatDuration(e.durationMs))
     }
+    if (id === MAIN) {
+      const { value: r = EMPTY } = await $.state.get(RUN)
+      const main = r.agents[MAIN]
+      if (main) {
+        // History is a nice-to-have: a store failure must not stop the turn ending.
+        await recordRequest($, {
+          at: main.startedAt ?? Date.now() - e.durationMs,
+          title: main.description,
+          outcome: e.isAborted ? 'interrupted' : e.reason === 'error' || e.reason === 'refusal' ? 'stuck' : 'done',
+          ms: e.durationMs,
+          tokens: totalTokens(r),
+          files: (r.files ?? []).length,
+        }).catch(() => undefined)
+      }
+    }
 
     return next(e)
   })
@@ -556,6 +655,8 @@ export const register: Register = (on, options) => {
     const { value: limits = [] } = await $.state.get(LIMITS)
     const { value: samples = {} } = await $.state.get(SAMPLES)
     const { value: expanded = [] } = await $.state.get(EXPANDED)
+    const { value: filesOpen = false } = await $.state.get(FILES_OPEN)
+    const { value: history } = await $.state.get(HISTORY)
     await $.state.get(TICK)
     const now = Date.now()
     const cols = Math.max(24, e.props.bodyColumns)
@@ -616,6 +717,65 @@ export const register: Register = (on, options) => {
     const runDone = ordered.every(a => a.isDone)
     const toggle = (id: string) => () => void $.state.set(
       EXPANDED, expanded.includes(id) ? expanded.filter(x => x !== id) : [...expanded, id],
+    )
+
+    const files = r.files ?? []
+    // Summary B: one line on the finished main row, the files behind a toggle.
+    const finishLine = (gutter: string, elapsed: string | undefined) => (
+      <Box flexDirection="column">
+        <Box flexDirection="row" gap={1}>
+          <Text color="success" wrap="truncate-end">{`${gutter}✓ ${[elapsed, `${formatTokens(totalTokens(r))} tok`].filter(Boolean).join(' · ')}`}</Text>
+          {files.length
+            ? <Button key="files" plain dimColor onPress={() => void $.state.set(FILES_OPEN, !filesOpen)}>{filesOpen ? '▾ hide files' : `▸ ${files.length} file${files.length === 1 ? '' : 's'}`}</Button>
+            : null}
+        </Box>
+        {filesOpen ? files.slice(0, FILES_SHOWN).map((f, n) => (
+          <Text key={f.path} wrap="truncate-end">
+            {gutter}
+            <Text color={f.isNew ? 'success' : 'warning'}>{f.isNew ? '+ ' : '~ '}</Text>
+            {f.path}
+            {n === FILES_SHOWN - 1 && files.length > FILES_SHOWN ? <Text dimColor>{` +${files.length - FILES_SHOWN} more`}</Text> : null}
+          </Text>
+        )) : null}
+      </Box>
+    )
+
+    // History A: a fold-out under the rows, a day at a time.
+    const today = dayKey(now)
+    const view: HistoryView = history ?? { day: today, entries: [], isOpen: false }
+    const isToday = view.day === today
+    const dayMs = view.entries.reduce((sum, h) => sum + h.ms, 0)
+    const dayTok = view.entries.reduce((sum, h) => sum + h.tokens, 0)
+    const historyBlock = (
+      <Box flexDirection="column">
+        <Text dimColor>{'─'.repeat(Math.min(cols, 48))}</Text>
+        <Button key="history" plain dimColor onPress={() => void $.state.set(HISTORY, { ...view, isOpen: !view.isOpen })}>
+          {view.isOpen ? '▾ hide history' : `▸ history · ${view.entries.length} ${isToday ? 'today' : dayLabel(view.day, today)}`}
+        </Button>
+        {view.isOpen
+          ? (
+            <Box flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+              <Box flexDirection="row" gap={1}>
+                <Button key="day-prev" plain dimColor onPress={() => void showDay($, shiftDay(view.day, -1))}>‹</Button>
+                <Text bold>{dayLabel(view.day, today)}</Text>
+                {isToday ? null : <Button key="day-next" plain dimColor onPress={() => void showDay($, shiftDay(view.day, 1))}>›</Button>}
+                <Text dimColor wrap="truncate-end">{` ${view.entries.length} · ${formatDuration(dayMs).replace(/\d+s$/, '') || '0m'} · ${formatTokens(dayTok)}`}</Text>
+              </Box>
+              {view.entries.length === 0 ? <Text dimColor>No requests this day.</Text> : null}
+              {view.entries.map((h, n) => (
+                <Box key={`h${n}`} flexDirection="column">
+                  <Text wrap="truncate-end">
+                    <Text dimColor>{clockTime(h.at)}</Text>
+                    <Text color={h.outcome === 'done' ? 'success' : 'warning'}>{h.outcome === 'done' ? ' ✓ ' : h.outcome === 'stuck' ? ' ⚠ ' : ' ■ '}</Text>
+                    {h.title}
+                  </Text>
+                  <Text dimColor wrap="truncate-end">{`        ${formatDuration(h.ms)} · ${formatTokens(h.tokens)} tok${h.files ? ` · ${h.files} file${h.files === 1 ? '' : 's'}` : ''}`}</Text>
+                </Box>
+              ))}
+            </Box>
+          )
+          : null}
+      </Box>
     )
 
     return (
@@ -689,6 +849,7 @@ export const register: Register = (on, options) => {
                 {isOpen ? earlier.map((act, n) => (
                   <Text key={String(n)} dimColor wrap="truncate-end">{`${gutter}  ${n + 1}. ${act}`}</Text>
                 )) : null}
+                {a.id === MAIN && runDone ? finishLine(gutter, elapsed) : null}
               </Box>
             )
           if (!Svg) return <Box key={a.id}>{lines}</Box>
@@ -701,6 +862,7 @@ export const register: Register = (on, options) => {
             </Box>
           )
         })}
+        {historyBlock}
       </Box>
     )
   })

@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { asksQuestion, contextGauge, describeCall, parseAccountUsage, forecastFull, formatDuration, gaugeRuns, limitGauge, modelBadge } from './register'
+import { asksQuestion, dayKey, projectPath, shiftDay, contextGauge, describeCall, parseAccountUsage, forecastFull, formatDuration, gaugeRuns, limitGauge, modelBadge } from './register'
 
 async function drain<R>(stream: AsyncGenerator<unknown, R> & { result: Promise<R> }): Promise<R> {
   for await (const _ of stream) { /* read to the end */ }
@@ -310,4 +310,55 @@ test('toasts and chimes when Claude needs you, gets stuck or finishes a long job
   await settle()
   expect(toasts.at(-1)).toBe('Done · 2m05s')
   expect(sounds.at(-1)).toBe('sounds/done.wav')
+})
+
+test('paths and days', () => {
+  expect(projectPath('C:\p\hooks\a.ts', 'C:\p')).toBe('hooks/a.ts')
+  expect(projectPath('/tmp/x.log', '/home/me/p')).toBe('x.log')
+  expect(shiftDay('2026-03-01', -1)).toBe('2026-02-28')
+  expect(dayKey(new Date(2026, 9, 16, 23, 59).getTime())).toBe('2026-10-16')
+})
+
+test('a finished request shows its summary and files, and lands in history', async ($, on) => {
+  const store = new Map<string, unknown>()
+  on('store.get', ($, e) => ({ value: store.get(e.key) }))
+  on('store.set', ($, e) => { store.set(e.key, e.value); return { value: undefined } })
+  on('store.keys', () => ({ value: [...store.keys()] }))
+  on('store.delete', ($, e) => { store.delete(e.key); return { value: undefined } })
+  on('fs.exists', ($, e) => ({ value: !String(e.path).endsWith('new.ts') }))
+  on('session.cwd', () => ({ value: 'C:\proj' }))
+  on('env.get', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.open', () => ({ value: { isPlaced: true as const } }))
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
+  on('tool.call', () => ({ result: {} }))
+  on('turn.complete', ($, e) => ({ text: e.answer }))
+
+  await $.turn.start({ text: 'port the bits', turnId: 't1' })
+  await $.tool.call({ tool: 'Write', file_path: 'C:\proj\hooks\new.ts', content: 'x' } as Parameters<typeof $.tool.call>[0])
+  await $.tool.call({ tool: 'Edit', file_path: 'C:\proj\hooks\old.ts', old_string: 'a', new_string: 'b' } as Parameters<typeof $.tool.call>[0])
+  await $.turn.complete({ answer: 'Done.', durationMs: 5_000, isAborted: false, reason: 'answer' } as Parameters<typeof $.turn.complete>[0])
+
+  const saved = store.get(`history:${dayKey(Date.now())}`) as Array<{ title: string; files: number; outcome: string }>
+  expect(saved).toHaveLength(1)
+  expect(saved[0]).toMatchObject({ title: 'port the bits', files: 2, outcome: 'done' })
+
+  const ui = await $.ui.mount({
+    plugin: 'claudelets-agent-monitor', surface: 'terminal', component: 'Pane', requestId: 'agent-monitor',
+    props: { bodyColumns: 44 } as never,
+  })
+  expect(await ui.find({ text: /▸ 2 files/ })).toBeDefined()
+  expect(await ui.find({ text: /hooks\/new.ts/ })).toBeUndefined()
+  await ui.press({ key: 'files' })
+  expect(await ui.find({ text: /hooks\/new.ts/ })).toBeDefined()
+  expect(await ui.find({ text: /hooks\/old.ts/ })).toBeDefined()
+
+  expect(await ui.find({ text: /▸ history · 1 today/ })).toBeDefined()
+  await ui.press({ key: 'history' })
+  expect(await ui.find({ text: /port the bits/ })).toBeDefined()
+  expect(await ui.find({ text: /^Today, / })).toBeDefined()
+  await ui.press({ key: 'day-prev' })
+  expect(await ui.find({ text: /No requests this day/ })).toBeDefined()
+  await ui.unmount()
 })
