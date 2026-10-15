@@ -9,6 +9,8 @@ const path = require('path')
 
 const DIR = __dirname
 const MODS = path.join(DIR, 'mods')
+// public repo: commit as the GitHub noreply address, never the real email
+const EMAIL = '23473849+LiamMorganDev@users.noreply.github.com'
 if (!fs.existsSync(path.join(os.homedir(), '.claude', '.claude-setup-autopush'))) process.exit(0)
 const git = (...args) => execFileSync('git', args, { cwd: DIR, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
 
@@ -30,7 +32,7 @@ try {
     const parts = [...new Set(files.map(f => { const p = f.split('/'); return p[0] === 'mods' && p.length > 2 ? p[1] : p[0] }))]
     const subject = `Update ${parts.join(', ')}`
     const body = files.slice(0, 30).join('\n') + (files.length > 30 ? `\n…and ${files.length - 30} more` : '')
-    git('commit', '-q', '-m', subject, '-m', body)
+    git('-c', `user.email=${EMAIL}`, '-c', 'user.name=LiamMorganDev', 'commit', '-q', '-m', subject, '-m', body)
   }
 
   // push anything unpushed (also retries a push that failed last time), without blocking the hook
