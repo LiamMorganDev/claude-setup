@@ -29,11 +29,30 @@ export type AgentRow = {
   model?: string
 }
 
+/** A file an agent wrote or edited: its path within the project (just its name outside it), and whether the request created it */
+export type TouchedFile = { path: string; isNew: boolean }
+
 export type Run = {
   /** Agent ids in the order they appeared, 'main' first */
   order: string[]
   agents: Record<string, AgentRow>
+  /** Files written or edited during the request, first touch first */
+  files?: TouchedFile[]
 }
+
+/** One finished request, as the history keeps it */
+export type HistoryEntry = {
+  /** Epoch ms the request started */
+  at: number
+  title: string
+  outcome: 'done' | 'stuck' | 'interrupted'
+  ms: number
+  tokens: number
+  files: number
+}
+
+/** The history fold-out: the day shown (YYYY-MM-DD, local), its requests, and whether it is open */
+export type HistoryView = { day: string; entries: HistoryEntry[]; isOpen: boolean }
 
 /** One usage reading: [epoch ms, percentUsed] */
 export type Sample = [number, number]
@@ -56,6 +75,9 @@ declare module 'claude-code' {
       expanded: string[]
       /** Bumped every second while an agent runs, so elapsed timers redraw */
       tick: number
+      /** Whether the finished request's file list is unfolded */
+      filesOpen: boolean
+      history: HistoryView
     }
   }
 }

@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { contextGauge, describeCall, parseAccountUsage, forecastFull, formatDuration, gaugeRuns, limitGauge, modelBadge } from './register'
+import { asksQuestion, contextGauge, describeCall, parseAccountUsage, forecastFull, formatDuration, gaugeRuns, limitGauge, modelBadge } from './register'
 
 async function drain<R>(stream: AsyncGenerator<unknown, R> & { result: Promise<R> }): Promise<R> {
   for await (const _ of stream) { /* read to the end */ }
@@ -260,4 +260,54 @@ test('account usage reads as 5h / 7d limits', () => {
     { kind: 'seven_day', percentUsed: 41 },
   ])
   expect(parseAccountUsage('{"five_hour":null}')).toEqual([])
+})
+
+test('secrets in tool lines are masked', () => {
+  expect(describeCall('Bash', { command: 'curl -H "x-api-key: sk-ant-abcdefghijklmnopqrstuvwx"' })).not.toMatch(/sk-ant-abc/)
+  expect(describeCall('Bash', { command: 'export API_KEY=hunter2secret' })).toContain('••••')
+  expect(describeCall('Read', { file_path: 'C:/x/notes.md' })).toBe('Reading notes.md')
+})
+
+test('a question at the end counts as asking', () => {
+  expect(asksQuestion('Want me to commit it?**')).toBe(true)
+  expect(asksQuestion('Done. Tests pass.')).toBe(false)
+})
+
+test('toasts and chimes when Claude needs you, gets stuck or finishes a long job', async ($, on) => {
+  const toasts: string[] = []
+  const sounds: string[] = []
+  on('ui.toast', ($, e) => { toasts.push(e.text); return { value: undefined } })
+  on('audio.play', ($, e) => { sounds.push(String((e.clip as { asset?: string }).asset)); return { value: undefined } })
+  on('env.get', () => ({ value: undefined }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.open', () => ({ value: { isPlaced: true as const } }))
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
+  on('turn.complete', ($, e) => ({ text: e.answer }))
+  const settle = async () => { for (let i = 0; i < 20; i++) await Promise.resolve() }
+  const end = (answer: string, extra: object = {}) =>
+    $.turn.complete({ answer, durationMs: 5_000, isAborted: false, reason: 'answer', ...extra } as Parameters<typeof $.turn.complete>[0])
+
+  await $.turn.start({ text: 'a', turnId: 't1' })
+  await end('Ship it?')
+  await settle()
+  expect(toasts.at(-1)).toMatch(/^Claude needs you/)
+  expect(sounds.at(-1)).toBe('sounds/needs-you.wav')
+
+  await $.turn.start({ text: 'b', turnId: 't2' })
+  await end('', { reason: 'error' })
+  await settle()
+  expect(toasts.at(-1)).toMatch(/^Claude is stuck/)
+
+  await $.turn.start({ text: 'c', turnId: 't3' })
+  const before = toasts.length
+  await end('All good.')
+  await settle()
+  // a 5s answer is quick: no chime
+  expect(toasts.length).toBe(before)
+
+  await $.turn.start({ text: 'd', turnId: 't4' })
+  await end('All good.', { durationMs: 125_000 })
+  await settle()
+  expect(toasts.at(-1)).toBe('Done · 2m05s')
+  expect(sounds.at(-1)).toBe('sounds/done.wav')
 })
