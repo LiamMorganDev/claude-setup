@@ -2,6 +2,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { AgentRow, RateLimit, Run, Sample, StepStatus } from '../types'
 import { claudeletAlt, claudeletSvg, type Pose } from './claudelet'
+import { maskPrivate } from './privacy'
 
 const PANE = 'agent-monitor'
 const MAIN = 'main'
@@ -83,7 +84,12 @@ const DOING_MAX = 40
 /** How many recent actions the recap under each row keeps */
 const HISTORY = 5
 
-const clip = (s: string): string => (s.length > DOING_MAX ? `${s.slice(0, DOING_MAX - 1)}…` : s)
+// Masked before clipping, so a cut can't leave half a key showing.
+const clip = (raw: string): string => {
+  const s = maskPrivate(raw)
+
+  return s.length > DOING_MAX ? `${s.slice(0, DOING_MAX - 1)}…` : s
+}
 
 const baseName = (p: string): string => p.split(/[\\/]/).filter(Boolean).pop() ?? p
 
@@ -333,9 +339,56 @@ function startTicker($: EngineInterface) {
     if (Object.values(r.agents).every(a => a.isDone)) {
       ticker?.cancel()
       ticker = undefined
+    } else if (!isStalled && inFlight === 0 && Date.now() - lastSignAt > STALL_MS && !Object.values(r.agents).some(a => a.isWaiting)) {
+      isStalled = true
+      void alert($, 'stuck', `nothing for ${formatDuration(Date.now() - lastSignAt)}`)
     }
     await $.state.set(TICK, Date.now())
   })
+}
+
+type Alert = 'needsYou' | 'stuck' | 'done'
+
+const ALERTS: Record<Alert, { asset: string; words: string }> = {
+  needsYou: { asset: 'sounds/needs-you.wav', words: 'Claude needs you' },
+  stuck: { asset: 'sounds/stuck.wav', words: 'Claude is stuck' },
+  done: { asset: 'sounds/done.wav', words: 'Done' },
+}
+/** A quicker finish needs no chime */
+export const LONG_JOB_MS = 60_000
+/** No step or tool call from a running request this long counts as stuck */
+export const STALL_MS = 3 * 60_000
+
+/** Claude's last message ends by asking something (trailing markup and quotes ignored). */
+export const asksQuestion = (answer: string): boolean =>
+  /[?？]$/.test(answer.trimEnd().replace(/[*_"'”»)\s]+$/g, ''))
+
+/** Toast plus chime. Windows terminals have no `$.audio` player, so Windows plays the clip through PowerShell. */
+async function alert($: EngineInterface, kind: Alert, detail?: string) {
+  const a = ALERTS[kind]
+  $.ui.toast(detail ? `${a.words} · ${detail}` : a.words)
+  try {
+    if ((await $.env.get('OS')) === 'Windows_NT') {
+      const file = `${$.plugin.root}\\${a.asset.replaceAll('/', '\\')}`.replaceAll("'", "''")
+      await $.process.run(['powershell', '-NoProfile', '-Command', `(New-Object Media.SoundPlayer '${file}').PlaySync()`])
+    } else {
+      await $.audio.play({ asset: a.asset })
+    }
+  } catch {
+    // No player here: the toast still shows.
+  }
+}
+
+// shortcut: module vars, so a hot reload forgets the last sign of life until the next step or call.
+let lastSignAt = Date.now()
+let isStalled = false
+/** Tool calls running now; a long command is not a stall */
+let inFlight = 0
+
+/** Claude did something: a stall, if flagged, is over. */
+const sign = () => {
+  lastSignAt = Date.now()
+  isStalled = false
 }
 
 export const register: Register = (on, options) => {
@@ -381,12 +434,13 @@ export const register: Register = (on, options) => {
   on('turn.start', async ($, e, next) => {
     const latest = await updateRun($, r => {
       const carried = r.order.filter(id => id !== MAIN && r.agents[id] && !r.agents[id].isDone)
-      const agents: Record<string, AgentRow> = { [MAIN]: newRow(MAIN, 'main', e.text.slice(0, 80)) }
+      const agents: Record<string, AgentRow> = { [MAIN]: newRow(MAIN, 'main', maskPrivate(e.text).slice(0, 80)) }
       for (const id of carried) agents[id] = r.agents[id]!
 
       return { order: [MAIN, ...carried], agents }
     })
     $.ui.status(summary(latest))
+    sign()
     await $.state.set(EXPANDED, [])
     startTicker($)
     const { value: hidden = false } = await $.state.get(HIDDEN)
@@ -405,7 +459,7 @@ export const register: Register = (on, options) => {
 
       return {
         order: [...r.order, id],
-        agents: { ...r.agents, [id]: { ...newRow(id, e.subagentType, e.description, parentId), model: spawned.model } },
+        agents: { ...r.agents, [id]: { ...newRow(id, e.subagentType, maskPrivate(e.description), parentId), model: spawned.model } },
       }
     })
     if (latest.agents[id]) $.ui.status(summary(latest))
@@ -416,8 +470,10 @@ export const register: Register = (on, options) => {
 
   on('turn.step', async function* ($, e, next) {
     const id = e.agentId ?? MAIN
+    sign()
     await change($, id, a => ({ ...a, doing: 'thinking…', isThinking: true, model: a.model ?? e.model }))
     const result = yield* next(e)
+    sign()
     const u = result.usage
     if (u) {
       const used = u.input_tokens + u.output_tokens + u.cache_creation_input_tokens
@@ -432,6 +488,7 @@ export const register: Register = (on, options) => {
     const verdict = await next(e)
     if (verdict.decision === 'ask' && e.tool_use_id) {
       await change($, e.agentId ?? MAIN, a => ({ ...a, isWaiting: true, isThinking: false }))
+      void alert($, 'needsYou', 'approve a tool call')
     }
 
     return verdict
@@ -445,7 +502,10 @@ export const register: Register = (on, options) => {
       ...a, doing, tool: String(e.tool), isThinking: false, isWaiting: ASKS_PERSON.has(String(e.tool)) || undefined,
       history: (a.history ?? []).at(-1) === doing ? a.history : [...(a.history ?? []), doing].slice(-HISTORY),
     }))
-    const ran = await next(e)
+    sign()
+    if (ASKS_PERSON.has(String(e.tool))) void alert($, 'needsYou', doing)
+    inFlight++
+    const ran = await next(e).finally(() => { inFlight--; sign() })
     await change($, id, a => (a.isWaiting ? { ...a, isWaiting: undefined } : a))
     if (ran.deny !== undefined || ran.isError) return ran
 
@@ -477,6 +537,11 @@ export const register: Register = (on, options) => {
       ...a, isDone: true, doing: label, isThinking: false, isWaiting: undefined,
       isError: e.reason === 'error' && !e.isAborted, endedAt: Date.now(),
     }))
+    if (id === MAIN && !e.isAborted) {
+      if (e.reason === 'error' || e.reason === 'refusal') void alert($, 'stuck', e.reason === 'error' ? 'stopped on an error' : 'refused')
+      else if (asksQuestion(e.answer)) void alert($, 'needsYou', 'answer the question in chat')
+      else if (e.durationMs >= LONG_JOB_MS) void alert($, 'done', formatDuration(e.durationMs))
+    }
 
     return next(e)
   })
