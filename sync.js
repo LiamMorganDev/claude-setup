@@ -19,7 +19,7 @@ const mods = fs.readdirSync(ROOT, { withFileTypes: true })
   .filter(m => m.manifest?.name)
 
 // third-party mods kept on everywhere, like the local ones
-const ALWAYS_ON = ['glanceflow@claude-mods']
+const ALWAYS_ON = []
 // plugin-dir mods are named <name>@inline; a project's enabledPlugins could still switch one off
 const ids = [...mods.map(m => `${m.manifest.name}@inline`), ...ALWAYS_ON]
 const localIds = mods.map(m => `${m.manifest.name}@local-mods`)
