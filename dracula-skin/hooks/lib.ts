@@ -86,8 +86,3 @@ export const divider = (tag: Tag) => `── [${tag.label}] ${'─'.repeat(24)}`
 /** Tree prefixes. The API can't tell a row it is the last of its turn, so calls always draw `├─`. */
 export const CALL_PREFIX = '├─ '
 export const RESULT_PREFIX = '│  ↳ '
-
-export const BANNER = {
-  title: '🦇  D R A C U L A  🦇',
-  welcome: 'The night is young. What shall we build?',
-}

@@ -82,35 +82,3 @@ test('rows draw tree branches, tags and turn dividers', async ($, on) => {
     await group.unmount()
   }
 })
-
-test('banner shows after session start and hides on first prompt; toast only in vscode', async ($, on) => {
-  const toasts: string[] = []
-  on('ui.render', ($, e) => {
-    const { Box } = $.ui.resolve(e)
-    return <Box />
-  })
-  on('session.start', ($, e) => ({ cwd: e.cwd }))
-  on('prompt.submit', ($, e) => ({ text: e.text }) as never)
-  on('ui.toast', ($, e) => {
-    toasts.push(String((e as { text?: unknown }).text ?? e))
-    return { value: undefined } as never
-  })
-  const mountBand = () => $.ui.mount({
-    plugin: 'dracula-skin', surface: 'desktop', component: 'AbovePrompt',
-    props: { hasSurvey: false, isWorking: false, bodyColumns: 100 } as never,
-  })
-
-  await $.session.start({ cwd: '/x', surface: 'desktop', isInteractive: true })
-  expect(toasts.length).toBe(0)
-  const band = await mountBand()
-  expect(await band.find({ text: /D R A C U L A/ })).toBeDefined()
-  await band.unmount()
-
-  await $.prompt.submit({ text: 'hi' } as never)
-  const hidden = await mountBand()
-  expect(await hidden.find({ text: /D R A C U L A/ })).toBe(undefined)
-  await hidden.unmount()
-
-  await $.session.start({ cwd: '/x', surface: 'vscode', isInteractive: true })
-  expect(toasts.length).toBe(1)
-})

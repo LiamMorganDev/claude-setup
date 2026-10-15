@@ -2,12 +2,11 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement, RenderInput } from 'claude-code'
 
 import {
-  BANNER, CALL_PREFIX, RESULT_PREFIX, TAGS, divider, isLightTheme, paletteFor,
+  CALL_PREFIX, RESULT_PREFIX, TAGS, divider, isLightTheme, paletteFor,
   tagForGroup, tagForResult, tagForToolUse,
 } from './lib'
-import type { Palette, Tag } from './lib'
+import type { Tag } from './lib'
 
-const isBannerShown = atom({ plugin: 'dracula-skin', key: 'isBannerShown' } as const, false)
 const isLight = atom({ plugin: 'dracula-skin', key: 'isLight' } as const, false)
 
 const palette = async ($: EngineInterface) => paletteFor(await read($, isLight))
@@ -54,10 +53,7 @@ async function withBranch($: EngineInterface, e: RenderInput, prefix: string, ta
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await update($, isBannerShown, () => true)
     await syncTheme($)
-    // VS Code draws no band above the prompt, so only there does the welcome go out as a toast.
-    if (e.surface === 'vscode') $.ui.toast(`${BANNER.title}  ${BANNER.welcome}`)
 
     return next(e)
   }).catch(($, e, next) => next(e))
@@ -68,29 +64,6 @@ export const register: Register = on => {
 
     return result
   }).catch(($, e, next) => next(e))
-
-  on('prompt.submit', async ($, e, next) => {
-    await update($, isBannerShown, () => false)
-
-    return next(e)
-  }).catch(($, e, next) => next(e))
-
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey || !(await read($, isBannerShown))) return next(e)
-    const { Box, Text } = $.ui.resolve(e)
-    const p: Palette = await palette($)
-
-    return (
-      <Box flexDirection="column">
-        <Text color={p.purple} bold>
-          {BANNER.title}
-        </Text>
-        <Text color={p.dim} italic>
-          {BANNER.welcome}
-        </Text>
-      </Box>
-    )
-  })
 
   on('ui.render', { component: 'UserMessage' }, async ($, e, next) =>
     withDivider($, e, TAGS.you, await next(e)),
