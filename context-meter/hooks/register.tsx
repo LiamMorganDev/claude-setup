@@ -3,36 +3,11 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Info } from '../types'
 
-const MAX = 1_000_000
-const WARN = 300_000
-const CELLS = 20 // 50k per cell
-const WARN_CELL = WARN / (MAX / CELLS) // marker after cell 6
 const GREEN = 'green'
 const ORANGE = '#FF8C00'
 const POLL_MS = 15_000
 
-const tokens = atom({ plugin: 'context-meter', key: 'tokens' } as const, null)
 const info = atom({ plugin: 'context-meter', key: 'info' } as const, { model: '', branch: '', dirty: 0, pb: '' } as Info)
-
-const compact = (n: number) =>
-  n >= 1_000_000 ? `${+(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : `${n}`
-
-// Bar as [filled, empty] strings for the parts before and after the 300k marker.
-export const meter = (t: number) => {
-  const filled = Math.min(CELLS, Math.round((t / MAX) * CELLS))
-  const cell = (i: number) => (i < filled ? '█' : '░')
-  const part = (from: number, to: number) => {
-    let s = ''
-    for (let i = from; i < to; i++) s += cell(i)
-    return { full: s.replace(/░/g, ''), empty: s.replace(/█/g, '') }
-  }
-  return {
-    before: part(0, WARN_CELL),
-    after: part(WARN_CELL, CELLS),
-    color: t >= WARN ? ORANGE : GREEN,
-    label: `${compact(t)}/${compact(MAX)}`,
-  }
-}
 
 // "Opus 5.5" from "claude-opus-5-5[1m]"; a name /model already spells nicely passes through.
 export const modelName = (id: string) => {
@@ -68,16 +43,9 @@ async function refresh($: EngineInterface) {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const r = await next(e)
-    const { context } = await $.session.usage()
-    await update($, tokens, () => context.tokens ?? null)
     void refresh($).catch(() => undefined)
     $.clock.every(POLL_MS, () => void refresh($).catch(() => undefined))
     return r
-  })
-
-  on('session.measure', async ($, e, next) => {
-    if (e.changed.includes('context')) await update($, tokens, () => e.context.tokens ?? null)
-    return next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
@@ -87,12 +55,10 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const t = await read($, tokens)
     const i = await read($, info)
-    if (e.props.hasSurvey || (t === null && !i.model)) return next(e)
+    if (e.props.hasSurvey || !i.model) return next(e)
     const { Box, Text } = $.ui.resolve(e)
     const sep = <Text dimColor> │ </Text>
-    const m = t === null ? null : meter(t)
     // other mods' band rows (bat-flyby) draw beneath this one instead of being dropped
     const below = await next(e)
     return (
@@ -108,14 +74,6 @@ export const register: Register = on => {
         ) : null}
         {i.pb ? sep : null}
         {i.pb ? <Text color={pbColor(i.pb)}>{i.pb}</Text> : null}
-        {m ? sep : null}
-        {m ? <Text dimColor>ctx </Text> : null}
-        {m ? <Text color={m.color}>{m.before.full}</Text> : null}
-        {m ? <Text dimColor>{m.before.empty}</Text> : null}
-        {m ? <Text color="warning">│</Text> : null}
-        {m ? <Text color={m.color}>{m.after.full}</Text> : null}
-        {m ? <Text dimColor>{m.after.empty}</Text> : null}
-        {m ? <Text color={m.color}> {m.label}</Text> : null}
       </Box>
       {below ?? null}
       </Box>

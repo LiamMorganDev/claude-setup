@@ -28,8 +28,11 @@ export type Run = {
   agents: Record<string, AgentRow>
 }
 
+/** A five_hour or seven_day usage-limit window, as session.measure reports it */
+export type RateLimit = { kind: string; percentUsed: number; resetsAt?: string }
+
 declare module 'claude-code' {
   interface PluginState {
-    'agent-monitor': { run: Run; isHidden: boolean; contextTokens: number }
+    'agent-monitor': { run: Run; isHidden: boolean; contextTokens: number; rateLimits: RateLimit[] }
   }
 }

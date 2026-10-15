@@ -10,6 +10,7 @@ const EMPTY: Run = { order: [], agents: {} }
 const RUN = { plugin: 'agent-monitor', key: 'run' } as const
 const HIDDEN = { plugin: 'agent-monitor', key: 'isHidden' } as const
 const CONTEXT = { plugin: 'agent-monitor', key: 'contextTokens' } as const
+const LIMITS = { plugin: 'agent-monitor', key: 'rateLimits' } as const
 
 /** Read-modify-write of the run with compare-and-set, retried when another write landed first. */
 async function updateRun($: EngineInterface, fn: (r: Run) => Run): Promise<Run> {
@@ -94,7 +95,7 @@ export const describeCall = (tool: string, input: Record<string, unknown>): stri
   return clip(arg ? `${name}: ${arg}` : name)
 }
 
-export const CONTEXT_FULL = 500_000
+export const CONTEXT_FULL = 1_000_000
 export const CONTEXT_WARN = 300_000
 
 /** The context bar as runs: filled, empty, and a break mark at the warning line. */
@@ -111,6 +112,24 @@ export const contextBar = (tokens: number, width: number) => {
   }
 
   return { runs, pct: Math.round((tokens / CONTEXT_FULL) * 100), isWarn: tokens > CONTEXT_WARN }
+}
+
+const LIMIT_LABELS: Record<string, string> = { five_hour: '5h', seven_day: '7d' }
+
+/** One usage-limit window as a bar: filled cells, used of 100%, and time left until it resets. */
+export const limitBar = (l: { kind: string; percentUsed: number; resetsAt?: string }, width: number, now: number) => {
+  const filled = Math.round((Math.min(100, Math.max(0, l.percentUsed)) / 100) * width)
+  const ms = l.resetsAt ? Date.parse(l.resetsAt) - now : NaN
+  const h = Math.floor(ms / 3_600_000)
+  const resets = !(ms > 0) ? '' : h >= 24 ? ` ↻${Math.floor(h / 24)}d${h % 24}h` : ` ↻${h}h${Math.floor((ms % 3_600_000) / 60_000)}m`
+
+  return {
+    label: (LIMIT_LABELS[l.kind] ?? l.kind).padEnd(3),
+    fill: '█'.repeat(filled),
+    empty: '░'.repeat(width - filled),
+    text: ` ${l.percentUsed}%/100%${resets}`,
+    level: l.percentUsed >= 90 ? 'error' : l.percentUsed >= 70 ? 'warning' : 'suggestion',
+  }
 }
 
 /** Writes a change to one agent's row (skipped for loops we don't track) and refreshes the status line. */
@@ -140,6 +159,7 @@ export const register: Register = on => {
 
   on('session.measure', async ($, e, next) => {
     if (e.changed.includes('context') && e.context.tokens !== undefined) await $.state.set(CONTEXT, e.context.tokens)
+    if (e.changed.includes('rateLimits')) await $.state.set(LIMITS, e.rateLimits.filter(l => l.kind in LIMIT_LABELS))
 
     return next(e)
   })
@@ -257,6 +277,7 @@ export const register: Register = on => {
     const Svg = 'Svg' in els ? els.Svg : undefined
     const { value: r = EMPTY } = await $.state.get(RUN)
     const { value: ctxTokens } = await $.state.get(CONTEXT)
+    const { value: limits = [] } = await $.state.get(LIMITS)
     const cols = Math.max(24, e.props.bodyColumns)
 
     if (!r.agents[MAIN]) {
@@ -302,14 +323,26 @@ export const register: Register = on => {
             <Text wrap="truncate-end">
               <Text dimColor>ctx </Text>
               {ctx.runs.map((run, i) => run.kind === 'empty'
-                ? <Text key={i} dimColor>{run.text}</Text>
-                : <Text key={i} color={run.kind === 'mark' ? 'warning' : fill}>{run.text}</Text>)}
+                ? <Text key={String(i)} dimColor>{run.text}</Text>
+                : <Text key={String(i)} color={run.kind === 'mark' ? 'warning' : fill}>{run.text}</Text>)}
               <Text color={ctx.isWarn ? 'warning' : undefined}>
-                {` ${ctx.pct}% ${formatTokens(ctxTokens)}/500k${ctx.isWarn ? ' ⚠' : ''}`}
+                {` ${ctx.pct}% ${formatTokens(ctxTokens)}/1M${ctx.isWarn ? ' ⚠' : ''}`}
               </Text>
             </Text>
           )
         })()}
+        {limits.map(l => {
+          const b = limitBar(l, Math.max(10, Math.min(30, cols - 22)), Date.now())
+
+          return (
+            <Text key={l.kind} wrap="truncate-end">
+              <Text dimColor>{`${b.label} `}</Text>
+              <Text color={b.level}>{b.fill}</Text>
+              <Text dimColor>{b.empty}</Text>
+              <Text color={b.level === 'suggestion' ? undefined : b.level}>{b.text}</Text>
+            </Text>
+          )
+        })}
         <Text dimColor>{'─'.repeat(Math.min(cols, 48))}</Text>
         {ordered.map((a, i) => {
           const depth = depthOf(a)
@@ -342,7 +375,7 @@ export const register: Register = on => {
               </Text>
               <Text dimColor wrap="truncate-end">{`${gutter}↳ ${doing}`}</Text>
               {(a.history ?? []).map((act, n) => (
-                <Text key={n} dimColor wrap="truncate-end">{`${gutter}  ${n + 1}. ${act}`}</Text>
+                <Text key={String(n)} dimColor wrap="truncate-end">{`${gutter}  ${n + 1}. ${act}`}</Text>
               ))}
             </Box>
           )

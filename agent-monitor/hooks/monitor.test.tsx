@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { contextBar, describeCall } from './register'
+import { contextBar, describeCall, limitBar } from './register'
 
 async function drain<R>(stream: AsyncGenerator<unknown, R> & { result: Promise<R> }): Promise<R> {
   for await (const _ of stream) { /* read to the end */ }
@@ -114,25 +114,40 @@ test('tool calls read as tiny plain-English lines', () => {
   expect(describeCall('Bash', { command: 'x'.repeat(80) })).toHaveLength(40)
 })
 
-test('context bar fills to 500k, marks 300k and warns past it', async ($, on) => {
-  const low = contextBar(100_000, 10)
-  expect(low).toEqual({ runs: [{ kind: 'fill', text: '██' }, { kind: 'empty', text: '░░░░' }, { kind: 'mark', text: '│' }, { kind: 'empty', text: '░░░' }], pct: 20, isWarn: false })
+test('context bar fills to 1M, marks 300k and warns past it', async ($, on) => {
+  const low = contextBar(200_000, 10)
+  expect(low).toEqual({ runs: [{ kind: 'fill', text: '██' }, { kind: 'empty', text: '░' }, { kind: 'mark', text: '│' }, { kind: 'empty', text: '░░░░░░' }], pct: 20, isWarn: false })
   expect(contextBar(350_000, 10).isWarn).toBe(true)
-  expect(contextBar(500_000, 10).pct).toBe(100)
+  expect(contextBar(1_000_000, 10).pct).toBe(100)
 
   on('ui.status', () => ({ value: undefined }))
   on('ui.open', () => ({ value: { isPlaced: true as const } }))
   on('turn.start', ($, e) => ({ turnId: e.turnId }))
   on('session.measure', ($, e) => ({ changed: e.changed }))
   await $.turn.start({ text: 'go', turnId: 't1' })
-  await $.session.measure({ context: { tokens: 350_000, window: 1_000_000, percent: 35 }, rateLimits: [], changed: ['context'] } as never)
+  await $.session.measure({
+    context: { tokens: 350_000, window: 1_000_000, percent: 35 },
+    rateLimits: [{ kind: 'five_hour', percentUsed: 42 }, { kind: 'seven_day', percentUsed: 91.5 }, { kind: 'spend_limit', percentUsed: 5 }],
+    changed: ['context', 'rateLimits'],
+  } as never)
   const ui = await $.ui.mount({
     plugin: 'agent-monitor', surface: 'desktop', component: 'Pane', requestId: 'agent-monitor',
     props: { bodyColumns: 44 } as never,
   })
-  expect(await ui.find({ text: /70% 350\.0k\/500k ⚠/ })).toBeDefined()
+  expect(await ui.find({ text: /35% 350\.0k\/1M ⚠/ })).toBeDefined()
+  expect(await ui.find({ text: /42%\/100%/ })).toBeDefined()
+  expect(await ui.find({ text: /91\.5%\/100%/ })).toBeDefined()
+  expect(await ui.find({ text: /spend_limit/ })).toBeUndefined()
   expect(await ui.find({ text: /go/ })).toBeDefined()
   await ui.unmount()
+})
+
+test('usage limit bar fills by percent and counts down to its reset', () => {
+  const now = Date.parse('2026-10-15T10:00:00Z')
+  const b = limitBar({ kind: 'five_hour', percentUsed: 40, resetsAt: '2026-10-15T12:30:00Z' }, 10, now)
+  expect(b).toEqual({ label: '5h ', fill: '████', empty: '░░░░░░', text: ' 40%/100% ↻2h30m', level: 'suggestion' })
+  expect(limitBar({ kind: 'seven_day', percentUsed: 95, resetsAt: '2026-10-18T13:00:00Z' }, 10, now).text).toBe(' 95%/100% ↻3d3h')
+  expect(limitBar({ kind: 'seven_day', percentUsed: 120 }, 10, now).fill).toHaveLength(10)
 })
 
 test('each row keeps a numbered recap of its last 5 actions', async ($, on) => {
