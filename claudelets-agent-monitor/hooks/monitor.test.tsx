@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { contextGauge, describeCall, forecastFull, formatDuration, gaugeRuns, limitGauge, modelBadge } from './register'
+import { contextGauge, describeCall, parseAccountUsage, forecastFull, formatDuration, gaugeRuns, limitGauge, modelBadge } from './register'
 
 async function drain<R>(stream: AsyncGenerator<unknown, R> & { result: Promise<R> }): Promise<R> {
   for await (const _ of stream) { /* read to the end */ }
@@ -248,4 +248,16 @@ test('each row folds its last 5 actions behind a toggle', async ($, on) => {
   expect(await ui.find({ text: /4. Reading e.ts/ })).toBeDefined()
   expect(await ui.find({ text: /Reading a.ts/ })).toBeUndefined()
   await ui.unmount()
+})
+
+test('account usage reads as 5h / 7d limits', () => {
+  expect(parseAccountUsage(JSON.stringify({
+    five_hour: { utilization: 63.4, resets_at: '2026-10-15T12:30:00Z' },
+    seven_day: { utilization: 41, resets_at: null },
+    seven_day_opus: { utilization: 3 },
+  }))).toEqual([
+    { kind: 'five_hour', percentUsed: 63.4, resetsAt: '2026-10-15T12:30:00Z' },
+    { kind: 'seven_day', percentUsed: 41 },
+  ])
+  expect(parseAccountUsage('{"five_hour":null}')).toEqual([])
 })

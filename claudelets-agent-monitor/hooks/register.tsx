@@ -235,6 +235,93 @@ async function openPane($: EngineInterface) {
   await $.ui.open({ id: PANE, title: 'Agents', columns: 46 })
 }
 
+/** Stores new limit readings: the gauges, the forecast's history, and a toast past 90% once per window. */
+async function applyLimits($: EngineInterface, all: RateLimit[]) {
+  const limits = all.filter(l => l.kind in LIMIT_LABELS)
+  const { value: before = [] } = await $.state.get(LIMITS)
+  if (JSON.stringify(before) !== JSON.stringify(limits)) await $.state.set(LIMITS, limits)
+  const now = Date.now()
+  const { value: samples = {} } = await $.state.get(SAMPLES)
+  const { value: alerted = {} } = await $.state.get(ALERTED)
+  const nextSamples: Record<string, Sample[]> = {}
+  for (const l of limits) {
+    // A drop means the window reset: start the history over.
+    const prev = (samples[l.kind] ?? []).filter(([t, p]) => t >= now - FORECAST_SPAN && p <= l.percentUsed)
+    // One reading a minute is plenty for a 30-minute rate, so 10 s polls don't crowd the window out.
+    const last = prev.at(-1)
+    nextSamples[l.kind] = last && now - last[0] < 60_000 && last[1] === l.percentUsed ? prev : [...prev, [now, l.percentUsed] as Sample].slice(-60)
+    const window = l.resetsAt ?? 'none'
+    if (l.percentUsed >= ALERT_AT && alerted[l.kind] !== window) {
+      const left = l.resetsAt ? Date.parse(l.resetsAt) - now : NaN
+      $.ui.toast(`${LIMIT_LABELS[l.kind]} usage at ${l.percentUsed}%${left > 0 ? ` · resets in ${formatDuration(left)}` : ''}`)
+      await $.state.set(ALERTED, { ...alerted, [l.kind]: window })
+    }
+  }
+  if (JSON.stringify(samples) !== JSON.stringify(nextSamples)) await $.state.set(SAMPLES, nextSamples)
+}
+
+/** The account-wide usage windows, as claude.ai's usage page reads them: every session's use, not just this one's. */
+const ACCOUNT_USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
+/** How long an account reading outranks the session's own figures */
+const ACCOUNT_FRESH = 60_000
+/** After a failed account read (no login, 401, 429), use the session's figures this long before trying again */
+const ACCOUNT_BACKOFF = 5 * 60_000
+
+/** The account usage body, `{ five_hour: { utilization, resets_at }, seven_day: ... }`, as limit readings. */
+export const parseAccountUsage = (text: string): RateLimit[] => {
+  const body = JSON.parse(text) as Record<string, { utilization?: number | null; resets_at?: string | null } | null>
+  const out: RateLimit[] = []
+  for (const kind of Object.keys(LIMIT_LABELS)) {
+    const w = body[kind]
+    if (w && typeof w.utilization === 'number') {
+      out.push({ kind, percentUsed: Math.round(w.utilization * 10) / 10, ...(w.resets_at ? { resetsAt: w.resets_at } : {}) })
+    }
+  }
+
+  return out
+}
+
+let accountReadAt = 0
+let accountRetryAt = 0
+let poller: { cancel: () => void } | undefined
+
+/** One refresh: this session's context fill, and the account's 5h / 7d (the session's last response as fallback). */
+async function poll($: EngineInterface) {
+  const usage = await $.session.usage()
+  const tokens = usage.context.tokens
+  if (tokens !== undefined) {
+    const { value: before } = await $.state.get(CONTEXT)
+    if (before !== tokens) await $.state.set(CONTEXT, tokens)
+  }
+  const now = Date.now()
+  if (now >= accountRetryAt) {
+    try {
+      const auth = await $.session.authorize()
+      if (auth?.kind !== 'bearer') throw new Error('no claude.ai login')
+      const res = await $.http.fetch(ACCOUNT_USAGE_URL, { headers: { 'anthropic-beta': 'oauth-2025-04-20' }, auth: auth.handle })
+      if (!res.ok) throw new Error(`usage ${res.status}`)
+      const limits = parseAccountUsage(res.text)
+      if (limits.length) {
+        accountReadAt = now
+        await applyLimits($, limits)
+
+        return
+      }
+    } catch {
+      accountRetryAt = now + ACCOUNT_BACKOFF
+    }
+  }
+  if (now - accountReadAt > ACCOUNT_FRESH) await applyLimits($, usage.rateLimits)
+}
+
+function startPoller($: EngineInterface, seconds: number) {
+  poller?.cancel()
+  poller = undefined
+  if (!(seconds > 0)) return
+  void poll($).catch(() => undefined)
+  poller = $.clock.every(Math.max(2, seconds) * 1000, () => void poll($).catch(() => undefined))
+}
+
 // shortcut: one ticker per module load; a reload drops it and the next turn or spawn restarts it.
 let ticker: { cancel: () => void } | undefined
 
@@ -251,8 +338,9 @@ function startTicker($: EngineInterface) {
   })
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
+    startPoller($, Number(options.pollSeconds ?? 10))
     await $.command.register({
       name: 'monitor',
       description: 'Show the live agent monitor pane (/monitor off hides it)',
@@ -264,26 +352,8 @@ export const register: Register = on => {
 
   on('session.measure', async ($, e, next) => {
     if (e.changed.includes('context') && e.context.tokens !== undefined) await $.state.set(CONTEXT, e.context.tokens)
-    if (e.changed.includes('rateLimits')) {
-      const limits = e.rateLimits.filter(l => l.kind in LIMIT_LABELS)
-      await $.state.set(LIMITS, limits)
-      const now = Date.now()
-      const { value: samples = {} } = await $.state.get(SAMPLES)
-      const { value: alerted = {} } = await $.state.get(ALERTED)
-      const nextSamples: Record<string, Sample[]> = {}
-      for (const l of limits) {
-        // A drop means the window reset: start the history over.
-        const prev = (samples[l.kind] ?? []).filter(([t, p]) => t >= now - FORECAST_SPAN && p <= l.percentUsed)
-        nextSamples[l.kind] = [...prev, [now, l.percentUsed] as Sample].slice(-60)
-        const window = l.resetsAt ?? 'none'
-        if (l.percentUsed >= ALERT_AT && alerted[l.kind] !== window) {
-          const left = l.resetsAt ? Date.parse(l.resetsAt) - now : NaN
-          $.ui.toast(`${LIMIT_LABELS[l.kind]} usage at ${l.percentUsed}%${left > 0 ? ` · resets in ${formatDuration(left)}` : ''}`)
-          await $.state.set(ALERTED, { ...alerted, [l.kind]: window })
-        }
-      }
-      await $.state.set(SAMPLES, nextSamples)
-    }
+    // With the account poll running, its figures (every session's use) outrank this session's last response.
+    if (e.changed.includes('rateLimits') && Date.now() - accountReadAt > ACCOUNT_FRESH) await applyLimits($, e.rateLimits)
 
     return next(e)
   })
