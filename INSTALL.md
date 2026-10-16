@@ -190,10 +190,10 @@ Short list: what was installed, what was skipped and why, anything that failed, 
 ## Update
 
 ```bash
-git -C ~/.claude/claude-setup pull
+node ~/.claude/claude-setup/update.js
 ```
 
-Mods, linked skills/commands and the status line update immediately (mods hot-reload; new mods load next session). Then refresh third-party parts:
+It pulls (fast-forward only; stops if you have local changes) and tidies what the pull left behind: leftover folders of deleted mods, dead skill/command links, copied commands (updated only where you haven't edited them; new ones added, deleted ones removed), and settings hooks / status line pointing at files that no longer exist (`settings.json` backed up first). It re-runs `sync.js` and lists anything in `global/` that changed. Start a new session after. Then refresh third-party parts:
 
 ```bash
 claude plugin marketplace update

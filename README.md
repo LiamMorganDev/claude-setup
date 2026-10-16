@@ -169,7 +169,11 @@ I don't use the upstream tool-sound hook or its status line; INSTALL.md removes 
 
 ## Update / uninstall
 
-See [INSTALL.md → Update](INSTALL.md#update) and [INSTALL.md → Uninstall](INSTALL.md#uninstall).
+```bash
+node ~/.claude/claude-setup/update.js
+```
+
+Pulls the latest and cleans up anything removed upstream (deleted mods, dead links, stale hooks). Start a new session after. More in [INSTALL.md → Update](INSTALL.md#update) and [INSTALL.md → Uninstall](INSTALL.md#uninstall).
 
 ## Licence
 
