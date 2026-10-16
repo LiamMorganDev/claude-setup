@@ -20,11 +20,6 @@
       "description": "Live pane of the current request: % complete, tokens and what each agent and subagent is doing, with a pixel Claude per agent dressed for its job; toasts (silently) when Claude needs you, gets stuck or finishes; masks secrets; finish summary and a 30-day request history"
     },
     {
-      "name": "context-meter",
-      "source": "./mods/context-meter",
-      "description": "Status row above the prompt: model │ branch ●dirty │ PB sync light"
-    },
-    {
       "name": "dracula-skin",
       "source": "./mods/dracula-skin",
       "description": "Dracula skin for desktop and VS Code: turn dividers, tree-line tool rows with [tags], light/dark palette, and a banner at session start"

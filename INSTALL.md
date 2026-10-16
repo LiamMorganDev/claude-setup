@@ -81,7 +81,7 @@ Skip if Mods not picked.
 3. Run it once now so the env block is written: `node ~/.claude/claude-setup/sync.js < /dev/null`
 4. Check `settings.json` → `env.CLAUDE_CODE_PLUGIN_DIRS` lists every chosen mod folder and `CLAUDE_CODE_PLUGIN_DIR_WATCH` is `"1"`.
 
-`context-meter` and the status line only show a PocketBase light when pb-light is on; nothing else to do for them.
+The status line only shows a PocketBase light when pb-light is on; nothing else to do for it.
 
 ## 6. Merge settings
 

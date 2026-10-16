@@ -62,7 +62,6 @@ Each folder has its own README with details.
 | [git-panel](mods/git-panel/) | Git side pane: diffs of every changed file, ahead/behind, stage/commit/push/pull/stash, worktree management | `/git-panel` |
 | [chat-blame](mods/chat-blame/) | Records which chat last edited each file, so git-panel badges every change with its chat | – |
 | [win-jar](mods/win-jar/) | Every finished step from every chat goes in a "shipped today" jar: pane, streaks, a toast per win | `/wins` |
-| [context-meter](mods/context-meter/) | Status row above the prompt: model │ branch ●dirty (│ PocketBase light) | – |
 | [unshipped-nag](mods/unshipped-nag/) | Toast when changes sit uncommitted 30+ min or commits are unpushed (max every 30 min) | – |
 | [lockstep-guards](mods/lockstep-guards/) | Flags `.env`/`.env.example` drift and schema/types/Zod changes made out of lockstep | – |
 | [bat-flyby](mods/bat-flyby/) | A Dracula bat flies across the band above the prompt when a `git push` succeeds | – |

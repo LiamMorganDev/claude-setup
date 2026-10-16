@@ -3,7 +3,7 @@
 **Optional, off by default.** A status light showing whether live PocketBase matches the repo's `pb_schema.json`: green ● in sync, amber ▲ drift (with a toast when it first drifts), red when the check fails.
 
 - **Use:** `/pb-light` rechecks now. Turn it on by removing `pb-light` from `skipMods` in `~/.claude/claude-setup.local.json`.
-- **Notes:** Read-only: one auth and one GET, never a write. Needs `POCKETBASE_URL`, `PB_ADMIN_EMAIL`, `PB_ADMIN_PASSWORD` in the repo `.env`. Result is cached in `~/.claude/pb-light.json` for the status line and context-meter. `/pb-drift` gives the full diff.
+- **Notes:** Read-only: one auth and one GET, never a write. Needs `POCKETBASE_URL`, `PB_ADMIN_EMAIL`, `PB_ADMIN_PASSWORD` in the repo `.env`. Result is cached in `~/.claude/pb-light.json` for the status line. `/pb-drift` gives the full diff.
 - **Version:** 0.2.0
 
 <!-- screenshot: add mods/pb-light/screenshot.png and reference it here -->
