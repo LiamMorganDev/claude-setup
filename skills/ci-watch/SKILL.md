@@ -8,7 +8,15 @@ Commit: $ARGUMENTS (no SHA given → `git rev-parse origin/main`). Attempt 1 unl
 
 1. **Find the run.** `gh run list --commit <sha> --json databaseId,status,conclusion,workflowName,url`. Nothing yet → wait about 15s (Monitor with an until-loop, never foreground `sleep`) and retry up to 4 times. Still nothing → the repo has no workflow for this push: say so in one line and stop. Several workflows → watch each one.
 2. **Watch it in the background.** `gh run watch <id> --exit-status --interval 30` with Bash `run_in_background: true`. Don't poll: you are re-invoked when it exits. Meanwhile carry on with whatever else the user asked, or end the turn with one line saying CI is being watched (run URL).
-3. **Passed** → one line: `CI green: <workflow> (<duration>) <url>`. Done.
+3. **Finished (any result)** → report it in this shape (job times from `gh run view <id> --json jobs`, `completedAt - startedAt`):
+
+   **CI passed** (or **CI failed**) — [run <id>](<url>)
+
+   | Job | Result | Time |
+   |---|---|---|
+   | <job name> (<what it runs, e.g. typecheck + lint>) | ✅ / ❌ / ⏭️ | 2m05s |
+
+   Then one line on what that proves (e.g. "prod image builds and stack comes up healthy") and anything notable (slowest job, a job slower than usual). Passed → done.
 4. **Cancelled** → a newer push superseded it. Stop; that push's own ci-watch covers it.
 5. **Failed** → `gh run view <id> --log-failed` (big output: `| tail -200` per failed job) and find the root cause.
    - **Infra/flake** (runner lost, network, registry rate limit, timeout with no code cause): `gh run rerun <id> --failed` once, then back to step 2. A second infra failure → stop and report.
@@ -18,4 +26,4 @@ Commit: $ARGUMENTS (no SHA given → `git rev-parse origin/main`). Attempt 1 unl
    - weaken a check to make it pass: deleting or skipping tests, loosening lint/type rules, `continue-on-error`, lower thresholds
    - touch secrets or repo/Actions settings
 
-Report each attempt in one line: run → cause → fix commit.
+For a failure, under the table add one line per attempt: run → cause → fix commit. Re-runs after a fix get the same table.
