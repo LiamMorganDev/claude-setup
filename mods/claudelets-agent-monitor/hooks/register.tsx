@@ -351,12 +351,12 @@ function startTicker($: EngineInterface) {
 
 type Alert = 'needsYou' | 'stuck' | 'done'
 
-const ALERTS: Record<Alert, { asset: string; words: string }> = {
-  needsYou: { asset: 'sounds/needs-you.wav', words: 'Claude needs you' },
-  stuck: { asset: 'sounds/stuck.wav', words: 'Claude is stuck' },
-  done: { asset: 'sounds/done.wav', words: 'Done' },
+const ALERTS: Record<Alert, string> = {
+  needsYou: 'Claude needs you',
+  stuck: 'Claude is stuck',
+  done: 'Done',
 }
-/** A quicker finish needs no chime */
+/** A quicker finish needs no toast */
 export const LONG_JOB_MS = 60_000
 /** No step or tool call from a running request this long counts as stuck */
 export const STALL_MS = 3 * 60_000
@@ -365,20 +365,9 @@ export const STALL_MS = 3 * 60_000
 export const asksQuestion = (answer: string): boolean =>
   /[?？]$/.test(answer.trimEnd().replace(/[*_"'”»)\s]+$/g, ''))
 
-/** Toast plus chime. Windows terminals have no `$.audio` player, so Windows plays the clip through PowerShell. */
+/** A silent toast: no sound. */
 async function alert($: EngineInterface, kind: Alert, detail?: string) {
-  const a = ALERTS[kind]
-  $.ui.toast(detail ? `${a.words} · ${detail}` : a.words)
-  try {
-    if ((await $.env.get('OS')) === 'Windows_NT') {
-      const file = `${$.plugin.root}\\${a.asset.replaceAll('/', '\\')}`.replaceAll("'", "''")
-      await $.process.run(['powershell', '-NoProfile', '-Command', `(New-Object Media.SoundPlayer '${file}').PlaySync()`])
-    } else {
-      await $.audio.play({ asset: a.asset })
-    }
-  } catch {
-    // No player here: the toast still shows.
-  }
+  $.ui.toast(detail ? `${ALERTS[kind]} · ${detail}` : ALERTS[kind])
 }
 
 // shortcut: module vars, so a hot reload forgets the last sign of life until the next step or call.

@@ -273,12 +273,11 @@ test('a question at the end counts as asking', () => {
   expect(asksQuestion('Done. Tests pass.')).toBe(false)
 })
 
-test('toasts and chimes when Claude needs you, gets stuck or finishes a long job', async ($, on) => {
+test('toasts silently when Claude needs you, gets stuck or finishes a long job', async ($, on) => {
   const toasts: string[] = []
   const sounds: string[] = []
   on('ui.toast', ($, e) => { toasts.push(e.text); return { value: undefined } })
   on('audio.play', ($, e) => { sounds.push(String((e.clip as { asset?: string }).asset)); return { value: undefined } })
-  on('env.get', () => ({ value: undefined }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.open', () => ({ value: { isPlaced: true as const } }))
   on('turn.start', ($, e) => ({ turnId: e.turnId }))
@@ -291,7 +290,6 @@ test('toasts and chimes when Claude needs you, gets stuck or finishes a long job
   await end('Ship it?')
   await settle()
   expect(toasts.at(-1)).toMatch(/^Claude needs you/)
-  expect(sounds.at(-1)).toBe('sounds/needs-you.wav')
 
   await $.turn.start({ text: 'b', turnId: 't2' })
   await end('', { reason: 'error' })
@@ -302,14 +300,14 @@ test('toasts and chimes when Claude needs you, gets stuck or finishes a long job
   const before = toasts.length
   await end('All good.')
   await settle()
-  // a 5s answer is quick: no chime
+  // a 5s answer is quick: no toast
   expect(toasts.length).toBe(before)
 
   await $.turn.start({ text: 'd', turnId: 't4' })
   await end('All good.', { durationMs: 125_000 })
   await settle()
   expect(toasts.at(-1)).toBe('Done · 2m05s')
-  expect(sounds.at(-1)).toBe('sounds/done.wav')
+  expect(sounds).toHaveLength(0)
 })
 
 test('paths and days', () => {
