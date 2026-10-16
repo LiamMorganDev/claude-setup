@@ -34,7 +34,7 @@ One `AskUserQuestion` call, **multi-select**, all ticked by default (put "(Recom
 | Component | Installs |
 |---|---|
 | Mods | `mods/*` loaded via `sync.js` (step 5) |
-| Own skill + commands | `/ui-build`, `/commit`, `/self-review`, `/ui-proto` |
+| Own skill + commands | `/ui-build`, `ci-watch`, `/commit`, `/self-review`, `/ui-proto` |
 | Third-party plugins | ponytail, i-have-adhd, glanceflow, filetree, ui-ux-pro-max (step 7) |
 | Third-party skills | Matt Pocock skills + browser-use (step 8) |
 | Skins | claude-skins + Windows patch (step 9) |
@@ -159,7 +159,7 @@ Then make it match this setup:
 
 **Skill + commands** (if picked). Link, so `git pull` updates them:
 
-- macOS/Linux: `ln -s ~/.claude/claude-setup/skills/ui-build ~/.claude/skills/ui-build`
+- macOS/Linux: `ln -s ~/.claude/claude-setup/skills/ui-build ~/.claude/skills/ui-build` (same for `ci-watch`, on Windows too)
 - Windows: `cmd //c "mklink /J %USERPROFILE%\.claude\skills\ui-build %USERPROFILE%\.claude\claude-setup\skills\ui-build"`
 - Commands: if `~/.claude/commands` doesn't exist, link the whole folder the same way. If it exists, link (macOS/Linux) or copy (Windows) each `commands/*.md` file in, asking before replacing a file with the same name.
 - If PocketBase = No, still install `/commit` (its PocketBase step only runs when a repo has `pb_schema.json`), but skip `pb-drift.md`.
@@ -205,7 +205,7 @@ Re-run step 8 for Matt Pocock skills and step 9 for skins (re-apply the Windows 
 ## Uninstall
 
 1. Restore `settings.json` and `CLAUDE.md` from the backup folder made in step 3 (ask first — they may have changed things since; offer to remove only this setup's keys instead).
-2. Remove links: `~/.claude/skills/ui-build`, `~/.claude/commands` (or the individual linked files). On Windows remove a junction with `cmd //c rmdir <path>` — **never** a recursive delete, which would follow the link into the repo.
+2. Remove links: `~/.claude/skills/ui-build`, `~/.claude/skills/ci-watch`, `~/.claude/commands` (or the individual linked files). On Windows remove a junction with `cmd //c rmdir <path>` — **never** a recursive delete, which would follow the link into the repo.
 3. `claude plugin uninstall` each third-party plugin they no longer want.
 4. Remove the skill folders copied in step 8. Skins: run the upstream `uninstall.sh`.
 5. Delete `~/.claude/claude-setup.local.json` and the `~/.claude/claude-setup` clone.

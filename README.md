@@ -15,12 +15,12 @@ Install my Claude setup from https://github.com/LiamMorganDev/claude-setup — f
 | Part | Where | What it is |
 |---|---|---|
 | [Mods](#mods-mine) | `mods/` | 10 Claude Code plugins I wrote: side panes, status rows, toasts and guard hooks |
-| [Skill](#skills) | `skills/ui-build/` | My `/ui-build` skill, chaining the UI skills below into one flow |
+| [Skills](#skills) | `skills/ui-build/`, `skills/ci-watch/` | My `/ui-build` skill (chains the UI skills below into one flow) and `ci-watch` (watches + fixes GitHub CI after a push to `main`) |
 | [Commands](#slash-commands) | `commands/` | `/commit`, `/self-review`, `/ui-proto`, `/pb-drift` |
 | [Global CLAUDE.md](#global-claudemd) | `global/CLAUDE.md` | My cross-project rules, generalised (no personal or project-specific bits) |
 | [Settings](#settings) | `global/settings.template.json` | Hooks, plugins, marketplaces and preferences, merged into yours on install |
 | [Status line](#status-line) | `statusline/statusline.js` | `🦇 model │ branch ●dirty │ ▓▓░░ 80% ctx`, themed by the active skin |
-| [Worktree hook](#worktree-merge-reminder) | `hooks/worktree-merge-reminder.js` | Reminds Claude to clean up merged git worktrees after a push to `main` |
+| [Worktree hook](#worktree-merge-reminder) | `hooks/worktree-merge-reminder.js` | After a push to `main`: tells Claude to run `ci-watch`, and to clean up merged git worktrees |
 | [Skins patch](#skins) | `skins/windows/` | Windows fixes for [claude-skins](https://github.com/basicScandal/claude-skins) |
 | Plumbing | `sync.js`, `.claude-plugin/marketplace.json` | Loads every mod from disk each session; also lets you install mods one by one |
 | Owner-only | `autopush.js` | Auto-commits and pushes this repo for me. **Never installed for anyone else.** |
@@ -32,6 +32,7 @@ Install my Claude setup from https://github.com/LiamMorganDev/claude-setup — f
 ├── claude-setup/            ← this repo (git clone)
 │   ├── mods/<mod>/          ← loaded straight from disk by sync.js (no plugin install)
 │   ├── skills/ui-build/     ← linked into ~/.claude/skills/ui-build
+│   ├── skills/ci-watch/     ← linked into ~/.claude/skills/ci-watch
 │   ├── commands/*.md        ← linked into ~/.claude/commands/
 │   ├── statusline/          ← settings.json statusLine points here
 │   ├── hooks/               ← settings.json PostToolUse points here
@@ -85,6 +86,7 @@ Each folder has its own README with details.
 | Skill | What it does |
 |---|---|
 | [`/ui-build`](skills/ui-build/SKILL.md) | Runs the full UI stack in order: `ponytail` → `grill-me` → `ui-ux-pro-max` → `ui-styling` → `/ui-proto`. Use: `/ui-build <what UI to change>` |
+| [`ci-watch`](skills/ci-watch/SKILL.md) | Watches the GitHub Actions run for a commit pushed to `main` in the background. On failure: re-runs once if it's a flake, otherwise fixes, commits and pushes, at most 2 fix attempts, then asks. Never `--no-verify` or weakened checks. Started by the worktree hook; manual: `/ci-watch <sha>` |
 
 ### Third-party (installed by INSTALL.md from their source repos)
 
@@ -147,7 +149,7 @@ Each folder has its own README with details.
 
 ## Worktree merge reminder
 
-[`hooks/worktree-merge-reminder.js`](hooks/worktree-merge-reminder.js) — `PostToolUse` on Bash/PowerShell. After a `git push` that updates `main`, it lists linked worktrees now fully merged and reminds Claude to remove them (see the worktree rules in `global/CLAUDE.md`). Reminder only; it changes nothing.
+[`hooks/worktree-merge-reminder.js`](hooks/worktree-merge-reminder.js) — `PostToolUse` on Bash/PowerShell. After a `git push` that updates `main`, it tells Claude to run the `ci-watch` skill for the pushed SHA (repos with `.github/workflows/` only), and lists linked worktrees now fully merged and reminds Claude to remove them (see the worktree rules in `global/CLAUDE.md`). Reminder only; it changes nothing.
 
 ## Skins
 
