@@ -124,6 +124,15 @@ export const describeCall = (tool: string, input: Record<string, unknown>): stri
   return clip(arg ? `${name}: ${arg}` : name)
 }
 
+/**
+ * The mode settles a core `ask` without a dialog in bypass/dontAsk, so no toast.
+ * shortcut: reads the configured defaultMode, not a mode switched mid-session; upgrade if the API exposes the live mode.
+ */
+const neverPrompts = async ($: { settings: { read: () => Promise<Readonly<Record<string, unknown>>> } }) => {
+  const permissions = (await $.settings.read().catch(() => ({}))).permissions as { defaultMode?: string } | undefined
+  return permissions?.defaultMode === 'bypassPermissions' || permissions?.defaultMode === 'dontAsk'
+}
+
 /** Tools that always wait on the person, whatever the permission mode. */
 const ASKS_PERSON = new Set(['AskUserQuestion', 'ExitPlanMode'])
 
@@ -549,7 +558,7 @@ export const register: Register = (on, options) => {
   // A call the mode puts to the person shows the claude-let raising its hand until it is answered.
   on('tool.check', async ($, e, next) => {
     const verdict = await next(e)
-    if (verdict.decision === 'ask' && e.tool_use_id) {
+    if (verdict.decision === 'ask' && e.tool_use_id && !(await neverPrompts($))) {
       await change($, e.agentId ?? MAIN, a => ({ ...a, isWaiting: true, isThinking: false }))
       void alert($, 'needsYou', 'approve a tool call')
     }

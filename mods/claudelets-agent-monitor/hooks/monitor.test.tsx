@@ -228,6 +228,26 @@ test('a claude-let raises its hand while a question or permission prompt is open
   expect(await alts()).toEqual(['main Claude waiting on you'])
 })
 
+test('no approve toast when the mode never prompts (bypass)', async ($, on) => {
+  const toasts: string[] = []
+  on('ui.toast', ($, e) => { toasts.push(e.text); return { value: undefined } })
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.open', () => ({ value: { isPlaced: true as const } }))
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
+  on('tool.check', () => ({ decision: 'ask' as const }))
+  let mode = 'bypassPermissions'
+  on('settings.read', () => ({ value: { permissions: { defaultMode: mode } } }))
+  const settle = async () => { for (let i = 0; i < 20; i++) await Promise.resolve() }
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  await $.tool.check({ tool: 'Bash', input: { command: 'rm x' }, tool_use_id: 'tu1' } as never)
+  await settle()
+  expect(toasts).toEqual([])
+  mode = 'default'
+  await $.tool.check({ tool: 'Bash', input: { command: 'rm x' }, tool_use_id: 'tu2' } as never)
+  await settle()
+  expect(toasts.at(-1)).toMatch(/^Claude needs you/)
+})
+
 test('each row folds its last 5 actions behind a toggle', async ($, on) => {
   on('ui.status', () => ({ value: undefined }))
   on('ui.open', () => ({ value: { isPlaced: true as const } }))
