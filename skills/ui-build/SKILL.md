@@ -2,7 +2,6 @@
 name: ui-build
 description: Run the full UI stack in one go — ponytail, grill-me, ui-ux-pro-max, ui-styling, then ui-proto.
 argument-hint: <what UI to change/build>
-disable-model-invocation: true
 ---
 
 Task: $ARGUMENTS
