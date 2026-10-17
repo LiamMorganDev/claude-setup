@@ -27,7 +27,7 @@
     {
       "name": "git-panel",
       "source": "./mods/git-panel",
-      "description": "Git side pane: diffs of every changed file, branch ahead/behind, stage/commit/push/pull/stash, and git worktree management"
+      "description": "Git side pane built around worktrees: per-worktree changes, PR + CI status, capped diffs, Commit with Claude, sync with main and merged-worktree cleanup"
     },
     {
       "name": "lockstep-guards",
