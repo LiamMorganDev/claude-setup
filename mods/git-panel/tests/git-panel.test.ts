@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { isBranchName, parseNumstat, parseStash, parseStatus, parseWorktrees, samePath, slugOf } from '../hooks/git'
+import { age, hunks, isBranchName, parseNumstat, parsePrs, parseStash, parseStatus, parseWorktrees, samePath, shortName, slugOf } from '../hooks/git'
 
 test('parseStatus splits staged, unstaged and untracked, and reads ahead/behind', () => {
   const out = [
@@ -60,35 +60,71 @@ test('parseStash, branch names, slugs and path compare', () => {
   expect(samePath('D:\\code\\app\\', 'd:/code/app')).toBe(true)
 })
 
+test('parsePrs keeps the newest PR per branch and reads CI and review', () => {
+  const json = JSON.stringify([
+    { number: 321, state: 'OPEN', isDraft: false, headRefName: 'claude/sweep', url: 'u321', reviewDecision: 'CHANGES_REQUESTED', statusCheckRollup: [{ name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }, { name: 'typecheck', status: 'COMPLETED', conclusion: 'FAILURE' }] },
+    { number: 300, state: 'CLOSED', isDraft: false, headRefName: 'claude/sweep', url: 'u300', statusCheckRollup: [] },
+    { number: 320, state: 'OPEN', isDraft: true, headRefName: 'claude/qr', url: 'u320', statusCheckRollup: [{ name: 'ci', status: 'IN_PROGRESS', conclusion: '' }] },
+    { number: 318, state: 'MERGED', isDraft: false, headRefName: 'claude/rel', url: 'u318', reviewDecision: 'APPROVED', statusCheckRollup: [{ context: 'legacy', state: 'SUCCESS' }] },
+  ])
+  const prs = parsePrs(json)
+  expect(prs['claude/sweep']).toEqual({ number: 321, url: 'u321', state: 'open', ci: 'fail', failed: 'typecheck', review: 'changes' })
+  expect(prs['claude/qr']?.state).toBe('draft')
+  expect(prs['claude/qr']?.ci).toBe('running')
+  expect(prs['claude/rel']).toEqual({ number: 318, url: 'u318', state: 'merged', ci: 'pass', failed: '', review: 'approved' })
+  expect(parsePrs('not json')).toEqual({})
+})
+
+test('shortName, age and hunks', () => {
+  expect(shortName('claude/ralawise-stock-sweep-a91c2e')).toBe('ralawise-stock-sweep')
+  expect(shortName('feat/bundle-image-crop')).toBe('feat/bundle-image-crop')
+  expect(age(0, 5000)).toBe('')
+  expect(age(1000, 13_000)).toBe('12s')
+  expect(age(0 + 1, 1 + 3 * 60_000)).toBe('3m')
+  expect(hunks('diff --git a/x b/x\nindex 1..2\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n')).toEqual(['@@ -1 +1 @@', '-a', '+b'])
+})
+
+const PROPS = { title: 'Git', isFocused: false, bodyColumns: 50, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} } as const
+
 for (const surface of ['desktop', 'terminal', 'vscode'] as const) {
-  test(`pane draws its tabs on ${surface}`, async $ => {
-    const drawn = await $.ui.mount({
-      plugin: 'git-panel',
-      surface,
-      component: 'Pane',
-      requestId: 'git-panel',
-      props: { title: 'Git', isFocused: false, bodyColumns: 50, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
-    })
+  test(`pane draws worktrees, tabs and the pinned footer on ${surface}`, async ($, on) => {
+    on('clock.now', async () => ({ value: 0 }))
+    const drawn = await $.ui.mount({ plugin: 'git-panel', surface, component: 'Pane', requestId: 'git-panel', props: PROPS })
     expect(await drawn.find({ key: 'tab-changes' })).toBeDefined()
-    expect(await drawn.find({ key: 'tab-worktrees' })).toBeDefined()
-    await drawn.press({ key: 'tab-worktrees' })
+    expect(await drawn.find({ key: 'tab-stash' })).toBeDefined()
+    expect(await drawn.find({ key: 'a-push' })).toBeDefined()
+    expect(await drawn.find({ key: 'refresh' })).toBeDefined()
+    await drawn.press({ key: 'new-wt' })
     expect(await drawn.find({ key: 'newwt' })).toBeDefined()
+    await drawn.press({ key: 'a-more' })
+    expect(await drawn.find({ key: 'm-stash' })).toBeDefined()
+    await drawn.press({ key: 'tab-stash' })
+    expect(await drawn.find({ key: 'stash-push' })).toBeDefined()
   })
 }
 
-// Fake git: one repo at D:/repo with one modified file.
+// Fake git: one repo at D:/repo with one modified file; gh answers one PR.
 const GIT: Record<string, string> = {
   'rev-parse': 'D:/repo\n',
-  worktree: 'worktree D:/repo\nHEAD 1\nbranch refs/heads/main\n\n',
+  worktree: 'worktree D:/repo\nHEAD 1\nbranch refs/heads/main\n\nworktree D:/repo/.claude/worktrees/x\nHEAD 2\nbranch refs/heads/claude/x-abc123\n\n',
   status: ['# branch.head main', '# branch.ab +0 -0', '1 .M N... 100644 100644 100644 a b src/a.ts', ''].join('\0'),
   diff: '2\t1\tsrc/a.ts\0',
+  'rev-list': '0\n',
+  branch: 'main\nclaude/x-abc123\n',
 }
+const UNIFIED = ['diff --git a/src/a.ts b/src/a.ts', '--- a/src/a.ts', '+++ b/src/a.ts', '@@ -1,2 +1,3 @@', ' a', '-b', '+c', '+d', ''].join('\n')
+const GH = JSON.stringify([{ number: 7, state: 'MERGED', isDraft: false, headRefName: 'claude/x-abc123', url: 'u7', statusCheckRollup: [] }])
 
 for (const surface of ['desktop', 'terminal', 'vscode'] as const) {
-  test(`clicking a file name opens its actions on ${surface}`, async ($, on) => {
+  test(`files open diffs, discard asks first, merged worktrees get a banner on ${surface}`, async ($, on) => {
+    const ran: string[][] = []
     on('process.run', async (_$, e) => {
+      ran.push([...e.argv])
+      if (e.argv[0] === 'gh') return { value: { exitCode: 0, stdout: GH, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
       const sub = e.argv.slice(3).find(a => !a.startsWith('-')) ?? ''
-      const out = sub === 'diff' && e.argv.includes('--cached') ? '' : GIT[sub] ?? ''
+      // the second worktree is clean, so it counts as removable once merged
+      if (sub === 'status' && e.argv[2]?.includes('worktrees')) return { value: { exitCode: 0, stdout: '# branch.head claude/x-abc123\0', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+      const out = sub === 'diff' && e.argv.includes('--cached') ? '' : sub === 'diff' && !e.argv.includes('--numstat') ? UNIFIED : sub === 'symbolic-ref' ? 'origin/main\n' : GIT[sub] ?? ''
       return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     })
     on('session.cwd', async () => ({ value: 'D:/repo' }))
@@ -99,21 +135,20 @@ for (const surface of ['desktop', 'terminal', 'vscode'] as const) {
     on('clock.after', async () => ({ value: undefined }) as never)
     on('clock.now', async () => ({ value: 0 }))
     await $.session.start({ cwd: 'D:/repo', surface, isInteractive: true })
-    const drawn = await $.ui.mount({
-      plugin: 'git-panel',
-      surface,
-      component: 'Pane',
-      requestId: 'git-panel',
-      props: { title: 'Git', isFocused: false, bodyColumns: 50, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
-    })
+    const drawn = await $.ui.mount({ plugin: 'git-panel', surface, component: 'Pane', requestId: 'git-panel', props: PROPS })
     const k = 'unstaged:src/a.ts'
     for (let i = 0; i < 20 && !(await drawn.find({ key: `stage-${k}` })); i++) await drawn.redraw()
-    expect(await drawn.find({ key: `m-stage-${k}` })).toBeUndefined()
+    expect(await drawn.find({ key: `diff-${k}` })).toBeUndefined()
     await drawn.press({ key: `name-${k}` })
-    expect(await drawn.find({ key: `m-stage-${k}` })).toBeDefined()
-    expect(await drawn.find({ key: `m-discard-${k}` })).toBeDefined()
-    expect(await drawn.find({ key: `m-ignore-${k}` })).toBeUndefined()
-    await drawn.press({ key: `m-close-${k}` })
-    expect(await drawn.find({ key: `m-stage-${k}` })).toBeUndefined()
+    expect(await drawn.find({ key: `diff-${k}` })).toBeDefined()
+    await drawn.press({ key: `discard-${k}` })
+    expect(await drawn.find({ key: 'dlg-discard' })).toBeDefined()
+    await drawn.press({ key: 'dlg-cancel' })
+    expect(await drawn.find({ key: 'dlg-discard' })).toBeUndefined()
+    expect(ran.some(a => a.includes('restore'))).toBe(false)
+    for (let i = 0; i < 20 && !(await drawn.find({ key: 'merged-ask' })); i++) await drawn.redraw()
+    expect(await drawn.find({ key: 'merged-ask' })).toBeDefined()
+    await drawn.press({ key: 'merged-ask' })
+    expect(await drawn.find({ key: 'merged-go' })).toBeDefined()
   })
 }

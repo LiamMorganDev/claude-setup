@@ -1,5 +1,5 @@
 // Pure parsers for git's machine output. No `$` here, so tests run them directly.
-import type { Change, Head, Stash, Worktree } from '../types'
+import type { Change, Head, Pr, Stash, Worktree } from '../types'
 
 export const EMPTY_HEAD: Head = { branch: '', upstream: '', ahead: 0, behind: 0 }
 
@@ -66,6 +66,8 @@ export function parseWorktrees(out: string): Worktree[] {
       dirty: 0,
       ahead: 0,
       behind: 0,
+      behindMain: 0,
+      merged: false,
     })
   }
   return list
@@ -93,3 +95,51 @@ export const samePath = (a: string, b: string) =>
 
 export const baseName = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 export const dirName = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/') + 1) : '')
+
+// claude/ralawise-stock-sweep-a91c2e → ralawise-stock-sweep
+export const shortName = (branch: string) => branch.replace(/^claude\//, '').replace(/-[0-9a-f]{6}$/, '')
+
+// 12s, 3m, 2h, 4d; '' when never
+export function age(ms: number, now: number) {
+  if (!ms) return ''
+  const s = Math.max(0, Math.round((now - ms) / 1000))
+  return s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s / 60)}m` : s < 86400 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`
+}
+
+type Check = { status?: string; conclusion?: string; state?: string; name?: string; context?: string }
+type GhPr = { number: number; state: string; isDraft: boolean; headRefName: string; url: string; reviewDecision?: string; statusCheckRollup?: Check[] }
+
+// `gh pr list --state all --json number,state,isDraft,headRefName,url,reviewDecision,statusCheckRollup` → newest PR per branch
+export function parsePrs(json: string): Record<string, Pr> {
+  const out: Record<string, Pr> = {}
+  let list: GhPr[]
+  try {
+    list = JSON.parse(json)
+  } catch {
+    return out
+  }
+  if (!Array.isArray(list)) return out
+  for (const p of list) {
+    if (!p?.headRefName || out[p.headRefName]) continue
+    const checks = p.statusCheckRollup ?? []
+    const bad = checks.find(c => ['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE', 'ACTION_REQUIRED'].includes(c.conclusion ?? c.state ?? ''))
+    const pending = checks.some(c => (c.status && c.status !== 'COMPLETED') || c.state === 'PENDING' || c.state === 'EXPECTED')
+    out[p.headRefName] = {
+      number: p.number,
+      url: p.url,
+      state: p.state === 'MERGED' ? 'merged' : p.state === 'CLOSED' ? 'closed' : p.isDraft ? 'draft' : 'open',
+      ci: bad ? 'fail' : pending ? 'running' : checks.length ? 'pass' : 'none',
+      failed: bad ? (bad.name ?? bad.context ?? '') : '',
+      review: p.reviewDecision === 'APPROVED' ? 'approved' : p.reviewDecision === 'CHANGES_REQUESTED' ? 'changes' : 'none',
+    }
+  }
+  return out
+}
+
+// Unified diff from its first hunk on: the file header lines are noise under a row that already names the file.
+export const hunks = (diff: string) => {
+  // Code refuses control characters (\r, NUL...); tabs stay.
+  const lines = diff.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').split('\n')
+  const at = lines.findIndex(l => l.startsWith('@@'))
+  return (at < 0 ? lines : lines.slice(at)).filter((l, i, a) => l || i < a.length - 1)
+}
