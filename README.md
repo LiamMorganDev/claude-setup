@@ -47,7 +47,8 @@ Every session, the `SessionStart` hook runs `sync.js`, which:
 1. writes every folder in `mods/` (minus `skipMods`) into `CLAUDE_CODE_PLUGIN_DIRS` in `settings.json`, with `CLAUDE_CODE_PLUGIN_DIR_WATCH=1`, so Desktop, VS Code and terminal sessions all load the mods from disk and hot-reload edits;
 2. keeps `.claude-plugin/marketplace.json` listing exactly the mods in `mods/`;
 3. installs + enables the `ALWAYS_ON` third-party plugin (glanceflow) and removes duplicate installed copies of local mods;
-4. re-enables any mod that a project's settings switch off.
+4. re-enables any mod that a project's settings switch off;
+5. removes `disable-model-invocation: true` from every `~/.claude/skills/*/SKILL.md`, so Claude can always see and call every global skill (third-party updates can re-add it).
 
 Because skills and commands are links into the clone, `git pull` updates everything.
 

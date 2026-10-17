@@ -94,3 +94,14 @@ if (projDir && path.resolve(projDir) !== path.resolve(os.homedir(), '.claude')) 
     fs.writeFileSync(LOCAL, JSON.stringify({ ...localSettings, enabledPlugins: localEnabled }, null, 2) + '\n')
   }
 }
+
+// 5. every global skill stays visible to Claude: drop disable-model-invocation, which
+// third-party skill updates can bring back (it hides a skill and blocks skill-to-skill calls)
+const SKILLS = path.join(os.homedir(), '.claude', 'skills')
+for (const d of fs.existsSync(SKILLS) ? fs.readdirSync(SKILLS) : []) {
+  const f = path.join(SKILLS, d, 'SKILL.md')
+  let text
+  try { text = fs.readFileSync(f, 'utf8') } catch { continue }
+  const next = text.replace(/^disable-model-invocation:\s*true\s*\r?\n/m, '')
+  if (next !== text) fs.writeFileSync(f, next)
+}
