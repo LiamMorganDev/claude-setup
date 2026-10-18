@@ -8,7 +8,7 @@ Compare the **live PocketBase** schema to the repo's `pb_schema.json`. **Read-on
 3. Use a scratch script (e.g. `.pb-drift.cjs`) to auth as superuser (`/api/collections/_superusers/auth-with-password`, falling back to `/api/admins/auth-with-password`), then fetch `/api/collections?perPage=200`. Delete the script after.
 4. Compare **semantically, per collection by `name`**: fields keyed by field `name` (ignore field `id`s, key order and array order), plus `type`, rules (`listRule`/`viewRule`/`createRule`/`updateRule`/`deleteRule`), `indexes`, and options (`viewQuery` etc.). Only report differences that survive normalisation.
 5. Report tersely, grouped:
-   - **Repo ahead** (would be pushed by `/commit` on main): new collections/fields, changed rules/indexes/options.
+   - **Repo ahead** (would be pushed by `/pb-align` after the next `release` push): new collections/fields, changed rules/indexes/options.
    - **Live ahead** (repo drift — don't touch, ask me which side is right): fields/collections only on live.
    - **Destructive if pushed**: drops or type narrowing, with live record counts.
    - Or: "In sync."

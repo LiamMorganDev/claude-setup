@@ -1,10 +1,13 @@
-// PostToolUse(Bash) hook: after a `git push` that updates main,
-// 1. if the repo has GitHub Actions workflows, tell Claude to run the ci-watch skill for the pushed SHA;
-// 2. list linked worktrees whose branch is now fully merged into main, and remind Claude to follow the global
-//    CLAUDE.md "Worktree merged into main" rule (align live PocketBase, then remove the worktree + branch).
+// PostToolUse(Bash) hook:
+// - after a `git push` that updates `release` in a repo with a pb_schema.json, remind Claude to run /pb-align
+//   (align live PocketBase to the release schema);
+// - after a `git push` that updates main,
+//   1. if the repo has GitHub Actions workflows, tell Claude to run the ci-watch skill for the pushed SHA;
+//   2. list linked worktrees whose branch is now fully merged into main, and remind Claude to follow the global
+//      CLAUDE.md "Worktree merged into main" rule (remove the worktree + branch).
 // Reminder only: it changes nothing.
 const { execFileSync } = require('node:child_process');
-const { readdirSync } = require('node:fs');
+const { existsSync, readdirSync } = require('node:fs');
 const { join } = require('node:path');
 
 let raw = '';
@@ -17,20 +20,32 @@ process.stdin.on('end', () => {
     const cwd = input.cwd || process.cwd();
     const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
-    // Only pushes that name main (`origin main`, `x:main`) or a bare push while on main.
     const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
-    // `git push <remote> <refspec…>` must name main; a bare `git push [remote]` counts only while on main.
-    const refspecs = cmd
-      .replace(/^.*?\bpush\b/, '')
-      .split(/[\n;&|]/)[0]
-      .trim()
-      .split(/\s+/)
-      .filter((a) => a && !a.startsWith('-'))
-      .slice(1);
-    if (refspecs.length ? !refspecs.some((r) => /(^|:)(refs\/heads\/)?main$/.test(r)) : branch !== 'main') return;
+    // `git push <remote> <refspec…>` must name the branch (`origin main`, `x:main`); a bare `git push [remote]`
+    // counts only while on it. Every `git … push` segment counts (`git push origin main; git push origin main:release`).
+    const pushes = cmd
+      .split(/[\n;&|]/)
+      .filter((seg) => /\bgit\b.*\bpush\b/.test(seg))
+      .map((seg) => seg.replace(/^.*?\bpush\b/, '').trim().split(/\s+/).filter((a) => a && !a.startsWith('-')).slice(1));
+    const names = (b) =>
+      pushes.some((refs) => (refs.length ? refs.some((r) => new RegExp(`(^|:)(refs/heads/)?${b}$`).test(r)) : branch === b));
+    const emit = (msgs) => {
+      if (!msgs.length) return;
+      const msg = msgs.join('\n\n');
+      process.stdout.write(
+        JSON.stringify({ systemMessage: msg, hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: msg } }),
+      );
+    };
+
+    const msgs = [];
+    // Live PocketBase follows production: align it on a release push, never on a main push.
+    if (names('release') && existsSync(join(git('rev-parse', '--show-toplevel'), 'pb_schema.json')))
+      msgs.push(
+        "Pushed to release. Run /pb-align now: align live PocketBase to the release branch's pb_schema.json (repo → live; confirm destructive changes first).",
+      );
+    if (!names('main')) return emit(msgs);
 
     const main = git('rev-parse', 'origin/main');
-    const msgs = [];
 
     // Push landed: the remote-tracking main now equals local main (a rejected push leaves them apart).
     let hasWorkflows = false;
@@ -63,13 +78,9 @@ process.stdin.on('end', () => {
     if (merged.length)
       msgs.push(
         `Pushed to main. These worktrees are now fully merged into origin/main: ${merged.join(', ')}. ` +
-          `Follow the global CLAUDE.md "Worktree merged into main" rule: align live PocketBase to main's pb_schema.json (if the repo has one), then remove each worktree (unlink any node_modules junction first) and its branch.`,
+          `Follow the global CLAUDE.md "Worktree merged into main" rule: remove each worktree (unlink any node_modules junction first) and its branch. Don't align live PocketBase now; that happens on a release push (/pb-align).`,
       );
-    if (!msgs.length) return;
-    const msg = msgs.join('\n\n');
-    process.stdout.write(
-      JSON.stringify({ systemMessage: msg, hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: msg } }),
-    );
+    emit(msgs);
   } catch {
     // never break the tool call over a reminder
   }

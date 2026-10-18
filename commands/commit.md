@@ -4,20 +4,10 @@ Run the following git commands to understand all current changes:
 - `git diff --cached` — see already-staged changes
 - `git log --oneline -10` — see recent commit style for this repo
 
-If there is nothing to commit (clean tree, nothing staged), say so, still do step 0 if requested, and stop — never create an empty commit or a version bump.
+If there is nothing to commit (clean tree, nothing staged), say so, and stop — never create an empty commit or a version bump.
 
 Then:
-0. **If the current branch is `main` and a `pb_schema.json` file exists at the repo root**, align the **live PocketBase to the repo** (repo → live). `pb_schema.json` is the source of truth; NEVER overwrite it from live.
-   - Read `POCKETBASE_URL`, `PB_ADMIN_EMAIL`, `PB_ADMIN_PASSWORD` from `.env`.
-   - Auth as superuser (`/api/collections/_superusers/auth-with-password`, falling back to `/api/admins/auth-with-password`) and fetch live collections (`/api/collections?perPage=200`). Use a scratch script (e.g. `.live-sync.cjs`) and delete it afterwards — never commit scratch files.
-   - Compare **semantically, per collection by `name`**: fields keyed by field `name` (ignore field `id`s, key order and array order), plus `type`, rules (`listRule`/`viewRule`/`createRule`/`updateRule`/`deleteRule`), `indexes`, and options (`viewQuery` etc.). A plain JSON/text diff is NOT enough — key-ordering noise shows up as false drift, so only report differences that survive normalisation.
-   - If they match, do nothing further.
-   - If they differ, **push the repo's version to live** via the admin API (`PATCH /api/collections/{id}`, or `POST /api/collections` for a new collection):
-     - Additive / non-destructive changes (new collection, new field, changed rule/index/options): apply, then re-fetch and re-compare to verify.
-     - **Destructive changes** (dropping a collection or field that has data, narrowing a field type): list them and confirm with the user first (AskUserQuestion). Check record counts before dropping.
-     - Multi-step hazards (e.g. adding a collection that a seed/migration populates before removing old fields) must be done in separate passes with confirmation between — see the project memory notes.
-   - Report in the response what was pushed (collections/fields). Remind the user that `shared/types/collections.ts` and affected `shared/schemas/` Zod schemas must match the schema (repo schema-sync rule) — verify they do rather than guessing edits.
-   - If live has fields the repo lacks, that is repo drift: flag it, do NOT delete it from live and do NOT silently overwrite the repo file — ask the user which side is right.
+0. **Never align live PocketBase here.** That happens after a push to `release` (`/pb-align`), not on commit or a push to `main`.
 1. Check whether `package.json` has been modified since the last push by running `git diff origin/$(git rev-parse --abbrev-ref HEAD) -- package.json`. If the version field has NOT changed (or package.json is unchanged), bump the version in `package.json` now before committing, choosing the level from what the change does:
    - **Patch** (`1.0.0` → `1.0.1`) — small changes: bug fixes, tweaks, copy/styling, refactors, docs, tooling, small improvements to an existing feature.
    - **Minor** (`1.0.1` → `1.1.0`) — a new feature: a new page, screen, workflow, integration or capability the user can now do that they couldn't before. If unsure whether it counts as a new feature (vs. patch), ask the user (AskUserQuestion) before bumping.

@@ -20,7 +20,7 @@ Install my Claude setup from https://github.com/LiamMorganDev/claude-setup — f
 | [Global CLAUDE.md](#global-claudemd) | `global/CLAUDE.md` | My cross-project rules, generalised (no personal or project-specific bits) |
 | [Settings](#settings) | `global/settings.template.json` | Hooks, plugins, marketplaces and preferences, merged into yours on install |
 | [Status line](#status-line) | `statusline/statusline.js` | `🦇 model │ branch ●dirty │ ▓▓░░ 80% ctx`, themed by the active skin |
-| [Worktree hook](#worktree-merge-reminder) | `hooks/worktree-merge-reminder.js` | After a push to `main`: tells Claude to run `ci-watch`, and to clean up merged git worktrees |
+| [Worktree hook](#worktree-merge-reminder) | `hooks/worktree-merge-reminder.js` | After a push to `main`: tells Claude to run `ci-watch`, and to clean up merged git worktrees. After a push to `release` (repos with `pb_schema.json`): tells Claude to run `/pb-align` |
 | [Skins patch](#skins) | `skins/windows/` | Windows fixes for [claude-skins](https://github.com/basicScandal/claude-skins) |
 | Plumbing | `sync.js`, `.claude-plugin/marketplace.json` | Loads every mod from disk each session; also lets you install mods one by one |
 | Owner-only | `autopush.js` | Auto-commits and pushes this repo for me. **Never installed for anyone else.** |
@@ -118,10 +118,11 @@ Each folder has its own README with details.
 
 | Command | What it does |
 |---|---|
-| [`/commit [and push]`](commands/commit.md) | Reviews the diff, bumps the patch version in `package.json`, writes a `vX.Y.Z — intent` message, updates `CHANGELOG.md` (Keep a Changelog, plain language) and collapses the entry from 30 commits ago. Pushes only if asked. Never adds a Claude co-author. If on `main` with a `pb_schema.json`, first aligns live PocketBase to it (does nothing in other repos). |
+| [`/commit [and push]`](commands/commit.md) | Reviews the diff, bumps the patch version in `package.json`, writes a `vX.Y.Z — intent` message, updates `CHANGELOG.md` (Keep a Changelog, plain language) and collapses the entry from 30 commits ago. Pushes only if asked. Never adds a Claude co-author. |
 | [`/self-review`](commands/self-review.md) | Harsh review of the latest work against correctness, completeness, the repo's own conventions and security; fixes what it finds, runs lint/typecheck/test/build, reports a table |
 | [`/ui-proto <change>`](commands/ui-proto.md) | Builds an Artifact with 2–3 switchable design options before any component code; implements the chosen one exactly |
 | [`/pb-drift`](commands/pb-drift.md) | *PocketBase only.* Read-only diff of live PocketBase vs `pb_schema.json` |
+| [`/pb-align`](commands/pb-align.md) | *PocketBase only.* Pushes `pb_schema.json` to live PocketBase (repo → live, destructive changes confirmed first). Run after a push to `release`; the worktree hook reminds you |
 
 ## Global CLAUDE.md
 
@@ -150,7 +151,7 @@ Each folder has its own README with details.
 
 ## Worktree merge reminder
 
-[`hooks/worktree-merge-reminder.js`](hooks/worktree-merge-reminder.js) — `PostToolUse` on Bash/PowerShell. After a `git push` that updates `main`, it tells Claude to run the `ci-watch` skill for the pushed SHA (repos with `.github/workflows/` only), and lists linked worktrees now fully merged and reminds Claude to remove them (see the worktree rules in `global/CLAUDE.md`). Reminder only; it changes nothing.
+[`hooks/worktree-merge-reminder.js`](hooks/worktree-merge-reminder.js) — `PostToolUse` on Bash/PowerShell. After a `git push` that updates `main`, it tells Claude to run the `ci-watch` skill for the pushed SHA (repos with `.github/workflows/` only), and lists linked worktrees now fully merged and reminds Claude to remove them (see the worktree rules in `global/CLAUDE.md`). After a push to `release` in a repo with a `pb_schema.json`, it tells Claude to run `/pb-align`. Reminder only; it changes nothing.
 
 ## Skins
 
