@@ -25,8 +25,10 @@ process.stdin.on('end', () => {
     // counts only while on it. Every `git … push` segment counts (`git push origin main; git push origin main:release`).
     const pushes = cmd
       .split(/[\n;&|]/)
-      .filter((seg) => /\bgit\b.*\bpush\b/.test(seg))
-      .map((seg) => seg.replace(/^.*?\bpush\b/, '').trim().split(/\s+/).filter((a) => a && !a.startsWith('-')).slice(1));
+      // Only segments that ARE a push (`git [-C dir] [-c k=v] push …`), not ones that merely mention it.
+      .map((seg) => /^\s*git\s+(?:(?:-C|-c)\s+\S+\s+|-\S+\s+)*push\b(.*)$/.exec(seg)?.[1])
+      .filter((rest) => rest !== undefined)
+      .map((rest) => rest.trim().split(/\s+/).filter((a) => a && !a.startsWith('-')).slice(1));
     const names = (b) =>
       pushes.some((refs) => (refs.length ? refs.some((r) => new RegExp(`(^|:)(refs/heads/)?${b}$`).test(r)) : branch === b));
     const emit = (msgs) => {
