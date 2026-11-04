@@ -179,7 +179,7 @@ Then make it match this setup:
 4. `ls ~/.claude/skills` shows the installed skills; `ls ~/.claude/commands` shows the commands.
 5. `claude plugin list` shows the third-party plugins enabled.
 
-Then tell the user to **start a new session** (mods, hooks and plugins load at session start) and try: `/monitor`, `/git-panel`, `/wins`, `/skin`, `/ui-build`, `/commit`.
+Then tell the user to **start a new session** (mods, hooks and plugins load at session start) and try: `/monitor`, `/wins`, `/skin`, `/ui-build`, `/commit`.
 
 ## 12. Report
 

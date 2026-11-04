@@ -10,11 +10,6 @@
       "description": "A Dracula bat flies across the band above the prompt whenever a git push succeeds"
     },
     {
-      "name": "chat-blame",
-      "source": "./mods/chat-blame",
-      "description": "Records which chat (session) last edited each file, so git-panel can badge every change with the chat it came from"
-    },
-    {
       "name": "claudelets-agent-monitor",
       "source": "./mods/claudelets-agent-monitor",
       "description": "Live pane of the current request: % complete, tokens and what each agent and subagent is doing, with a pixel Claude per agent dressed for its job; toasts (silently) when Claude needs you, gets stuck or finishes; masks secrets; finish summary and a 30-day request history"
@@ -23,11 +18,6 @@
       "name": "dracula-skin",
       "source": "./mods/dracula-skin",
       "description": "Dracula skin for desktop and VS Code: turn dividers, tree-line tool rows with [tags], light/dark palette, and a banner at session start"
-    },
-    {
-      "name": "git-panel",
-      "source": "./mods/git-panel",
-      "description": "Git side pane built around worktrees: per-worktree changes, PR + CI status, capped diffs, Commit with Claude, sync with main and merged-worktree cleanup"
     },
     {
       "name": "lockstep-guards",

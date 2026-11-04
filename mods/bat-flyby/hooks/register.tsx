@@ -41,7 +41,7 @@ export const register: Register = on => {
     return r
   })
 
-  // Pushes other mods run (git-panel's push chip).
+  // Pushes other mods run.
   on('process.run', async ($, e, next) => {
     const r = await next(e)
     const [cmd, ...args] = e.argv

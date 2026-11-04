@@ -1,9 +1,0 @@
-{
-  "name": "git-panel",
-  "version": "1.0.0",
-  "author": {
-    "name": "Liam"
-  },
-  "description": "Git side pane built around worktrees: per-worktree changes, PR + CI status, capped diffs, Commit with Claude, sync with main and merged-worktree cleanup",
-  "types": "./types/index.d.ts"
-}
