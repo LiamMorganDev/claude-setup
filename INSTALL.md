@@ -40,6 +40,7 @@ One `AskUserQuestion` call, **multi-select**, all ticked by default (put "(Recom
 | Skins | claude-skins + Windows patch (step 9) |
 | Status line | `statusline/statusline.js` |
 | Worktree hook | `hooks/worktree-merge-reminder.js` |
+| Agent team | `agents/` → `~/.claude/agents` (linked by `sync.js`; step 10) |
 | Global CLAUDE.md | `global/CLAUDE.md` (step 10) |
 
 A second call (single-select each):
@@ -164,10 +165,12 @@ Then make it match this setup:
 - If PocketBase = No, still install `/commit` (its PocketBase step only runs when a repo has `pb_schema.json`), but skip `pb-drift.md`.
 - `/commit` writes `CHANGELOG.md`, bumps `package.json` and never adds a Claude co-author. Mention this so they're not surprised.
 
+**Agent team** (if picked): `sync.js` links `agents/` to `~/.claude/agents` when that folder doesn't exist. If it already exists, ask: *Move mine aside and link (Recommended)* (rename to `agents.bak-<date>`, then re-run `sync.js`) / *Skip*. Not picked: create an empty `~/.claude/agents` folder so `sync.js` leaves it alone.
+
 **Global CLAUDE.md** (if picked):
 
 1. Take `$CS/global/CLAUDE.md`. Remove the leading `<!-- claude-setup … -->` comment.
-2. For each `<!-- optional:X -->…<!-- /optional:X -->` block: keep the content if X was installed (`mods` → Mods, `worktrees` → Worktree hook, `ponytail`/`adhd`/`ui-ux-pro-max` → that plugin, `browser-use` → that skill), else delete the block. Remove the marker lines either way.
+2. For each `<!-- optional:X -->…<!-- /optional:X -->` block: keep the content if X was installed (`agents` → Agent team, `mods` → Mods, `worktrees` → Worktree hook, `ponytail`/`adhd`/`ui-ux-pro-max` → that plugin, `browser-use` → that skill), else delete the block. Remove the marker lines either way.
 3. If `~/.claude/CLAUDE.md` doesn't exist, write it. If it does, show the user the sections that would be added and ask: *Append (Recommended)* / *Replace* / *Skip*.
 
 ## 11. Verify
@@ -175,7 +178,7 @@ Then make it match this setup:
 1. `node -e "JSON.parse(require('fs').readFileSync(require('os').homedir()+'/.claude/settings.json','utf8'))"` — settings parse.
 2. `node ~/.claude/claude-setup/sync.js < /dev/null` exits 0.
 3. Status line: `echo '{"model":{"display_name":"Test"},"cwd":"'$HOME_FWD'/.claude/claude-setup","context_window":{"remaining_percentage":80}}' | node ~/.claude/claude-setup/statusline/statusline.js` prints a line.
-4. `ls ~/.claude/skills` shows the installed skills; `ls ~/.claude/commands` shows the commands.
+4. `ls ~/.claude/skills` shows the installed skills; `ls ~/.claude/commands` shows the commands; `ls ~/.claude/agents` shows the agents (if picked).
 5. `claude plugin list` shows the third-party plugins enabled.
 
 Then tell the user to **start a new session** (mods, hooks and plugins load at session start) and try: `/monitor`, `/wins`, `/skin`, `/ui-build`, `/commit`.

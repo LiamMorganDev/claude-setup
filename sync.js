@@ -105,3 +105,13 @@ for (const d of fs.existsSync(SKILLS) ? fs.readdirSync(SKILLS) : []) {
   const next = text.replace(/^disable-model-invocation:\s*true\s*\r?\n/m, '')
   if (next !== text) fs.writeFileSync(f, next)
 }
+
+// 6. the agent team (agents/) is linked into ~/.claude/agents, so edits and learned rules
+// are live everywhere and land in this repo; an existing real folder is left alone
+const AGENTS = path.join(os.homedir(), '.claude', 'agents')
+const agentsSrc = path.join(__dirname, 'agents')
+let agentsLink = null
+try { agentsLink = fs.lstatSync(AGENTS) } catch {}
+if (!agentsLink && fs.existsSync(agentsSrc)) {
+  try { fs.symlinkSync(agentsSrc, AGENTS, 'junction') } catch {}
+}

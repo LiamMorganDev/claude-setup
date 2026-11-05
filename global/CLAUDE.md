@@ -38,6 +38,12 @@ These apply to any repo unless its own CLAUDE.md overrides them.
 <!-- /optional:worktrees -->
 - **Offer multiple options in artifacts/prototypes.** When building an Artifact or prototype, present 2+ alternative solutions/designs to pick from rather than a single option, unless the user has already specified exactly what they want.
 
+<!-- optional:agents -->
+## Agent team
+
+For any non-trivial build (more than one area, or more than ~3 files), the main session is the **principal-engineer**: read `~/.claude/agents/principal-engineer.md` and its memory (`~/.claude/agent-memory/principal-engineer/MEMORY.md`) and follow it. It delegates to `researcher`, `ux-designer`, `frontend-engineer`, `backend-engineer`, `code-reviewer`, `qa-tester`, `docs-keeper` and `devops`, relays their questions to me (they can't ask me), loops QA/review feedback to the same agent (max 2 rounds, then me), hands agreed plans to fresh sessions (one per slice), and records what I correct into each agent's memory. Quick edits and questions stay in the main session.
+<!-- /optional:agents -->
+
 ## Always-on skills
 
 Apply these in every project, every session, without being asked (each is installed by INSTALL.md):

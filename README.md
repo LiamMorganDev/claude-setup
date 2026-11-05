@@ -16,6 +16,7 @@ Install my Claude setup from https://github.com/LiamMorganDev/claude-setup — f
 |---|---|---|
 | [Mods](#mods-mine) | `mods/` | 10 Claude Code plugins I wrote: side panes, status rows, toasts and guard hooks |
 | [Skills](#skills) | `skills/ui-build/`, `skills/ci-watch/` | My `/ui-build` skill (chains the UI skills below into one flow) and `ci-watch` (watches + fixes GitHub CI after a push to `main`) |
+| [Agents](#agent-team) | `agents/` | A 9-agent team (principal, ux, frontend, backend, reviewer, QA, researcher, docs, devops) that learns my preferences into its own memory |
 | [Commands](#slash-commands) | `commands/` | `/commit`, `/self-review`, `/ui-proto`, `/pb-drift` |
 | [Global CLAUDE.md](#global-claudemd) | `global/CLAUDE.md` | My cross-project rules, generalised (no personal or project-specific bits) |
 | [Settings](#settings) | `global/settings.template.json` | Hooks, plugins, marketplaces and preferences, merged into yours on install |
@@ -31,6 +32,7 @@ Install my Claude setup from https://github.com/LiamMorganDev/claude-setup — f
 ~/.claude/
 ├── claude-setup/            ← this repo (git clone)
 │   ├── mods/<mod>/          ← loaded straight from disk by sync.js (no plugin install)
+│   ├── agents/              ← linked into ~/.claude/agents by sync.js (the agent team)
 │   ├── skills/ui-build/     ← linked into ~/.claude/skills/ui-build
 │   ├── skills/ci-watch/     ← linked into ~/.claude/skills/ci-watch
 │   ├── commands/*.md        ← linked into ~/.claude/commands/
@@ -109,6 +111,26 @@ Each folder has its own README with details.
 3. `ui-ux-pro-max`
 4. `/ui-proto`
 5. `wayfinder`, `research`, `ponytail-review` / `ponytail-audit`, `/pb-drift`
+
+## Agent team
+
+`agents/` is linked into `~/.claude/agents` by `sync.js` (a junction on Windows), so every session sees the team and every edit lands back in this repo.
+
+| Agent | Model | Does |
+|---|---|---|
+| [principal-engineer](agents/principal-engineer.md) | main session | Plans, delegates, relays agents' questions to you, loops QA feedback (2 rounds, then you), hands each agreed plan slice to a fresh session, runs the learning loop |
+| [ux-designer](agents/ux-designer.md) | Opus, medium | Options Artifact for every design decision, recommendations, "Copy my picks"; mocks only |
+| [frontend-engineer](agents/frontend-engineer.md) | Opus, medium | Builds the approved mock exactly + data, state, routing |
+| [backend-engineer](agents/backend-engineer.md) | Opus, medium | Everything that isn't frontend |
+| [code-reviewer](agents/code-reviewer.md) | Opus, medium | Read-only review of each diff before QA |
+| [qa-tester](agents/qa-tester.md) | Opus, medium | Quality gate, acceptance criteria in the running app, before/after screenshots; reports, never fixes |
+| [researcher](agents/researcher.md) | Haiku | Read-only fact finding with sources |
+| [docs-keeper](agents/docs-keeper.md) | Haiku | docs/, README, `.env`/`.env.example` parity |
+| [devops](agents/devops.md) | Haiku | Docker, CI, deploys, live DB; asks before anything production-facing |
+
+**How it learns:** each agent has `memory: user` (`~/.claude/agent-memory/<agent>/`, private, never in this repo). Corrections you make and each agent's `LEARNINGS:` line go there. At the end of a task the principal proposes rules that apply everywhere; the ones you approve are written into that agent's `## Learned rules` section here (and auto-pushed).
+
+**Use it:** the global CLAUDE.md tells the main session to act as principal for non-trivial work. Or run `claude --agent principal-engineer`, or name an agent ("use qa-tester on this").
 
 ## Slash commands
 
