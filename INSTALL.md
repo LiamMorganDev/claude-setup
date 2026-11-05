@@ -35,7 +35,7 @@ One `AskUserQuestion` call, **multi-select**, all ticked by default (put "(Recom
 |---|---|
 | Mods | `mods/*` loaded via `sync.js` (step 5) |
 | Own skill + commands | `/ui-build`, `ci-watch`, `/commit`, `/self-review`, `/ui-proto` |
-| Third-party plugins | ponytail, i-have-adhd, glanceflow, filetree, ui-ux-pro-max (step 7) |
+| Third-party plugins | ponytail, i-have-adhd, filetree, ui-ux-pro-max (step 7) |
 | Third-party skills | Matt Pocock skills + browser-use (step 8) |
 | Skins | claude-skins + Windows patch (step 9) |
 | Status line | `statusline/statusline.js` |
@@ -104,7 +104,6 @@ Skip any not picked. Run each pair (terminal CLI form; inside a session `/plugin
 ```bash
 claude plugin marketplace add DietrichGebert/ponytail      && claude plugin install ponytail@ponytail
 claude plugin marketplace add ayghri/i-have-adhd           && claude plugin install i-have-adhd@i-have-adhd
-claude plugin marketplace add Antreas-Strb/glanceflow      && claude plugin install glanceflow@claude-mods
 claude plugin marketplace add data-goblin/claude-code-filetree && claude plugin install filetree@claude-code-filetree
 claude plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill && claude plugin install ui-ux-pro-max@ui-ux-pro-max-skill
 ```
@@ -197,7 +196,7 @@ It pulls (fast-forward only; stops if you have local changes) and tidies what th
 
 ```bash
 claude plugin marketplace update
-for p in ponytail@ponytail i-have-adhd@i-have-adhd glanceflow@claude-mods filetree@claude-code-filetree ui-ux-pro-max@ui-ux-pro-max-skill; do claude plugin update "$p"; done
+for p in ponytail@ponytail i-have-adhd@i-have-adhd filetree@claude-code-filetree ui-ux-pro-max@ui-ux-pro-max-skill; do claude plugin update "$p"; done
 ```
 
 Re-run step 8 for Matt Pocock skills and step 9 for skins (re-apply the Windows patch after). If `global/CLAUDE.md` or the settings template changed (`git log -p -- global/`), offer to re-merge those changes.

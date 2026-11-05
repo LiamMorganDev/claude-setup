@@ -19,14 +19,12 @@
   "enabledPlugins": {
     "ponytail@ponytail": true,
     "i-have-adhd@i-have-adhd": true,
-    "glanceflow@claude-mods": true,
     "ui-ux-pro-max@ui-ux-pro-max-skill": true
   },
   "extraKnownMarketplaces": {
     "claude-setup": { "source": { "source": "github", "repo": "LiamMorganDev/claude-setup" } },
     "ponytail": { "source": { "source": "github", "repo": "DietrichGebert/ponytail" } },
     "i-have-adhd": { "source": { "source": "github", "repo": "ayghri/i-have-adhd" } },
-    "claude-mods": { "source": { "source": "github", "repo": "Antreas-Strb/glanceflow" } },
     "ui-ux-pro-max-skill": { "source": { "source": "github", "repo": "nextlevelbuilder/ui-ux-pro-max-skill" } }
   },
   "_optional": {

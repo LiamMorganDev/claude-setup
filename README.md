@@ -46,7 +46,7 @@ Every session, the `SessionStart` hook runs `sync.js`, which:
 
 1. writes every folder in `mods/` (minus `skipMods`) into `CLAUDE_CODE_PLUGIN_DIRS` in `settings.json`, with `CLAUDE_CODE_PLUGIN_DIR_WATCH=1`, so Desktop, VS Code and terminal sessions all load the mods from disk and hot-reload edits;
 2. keeps `.claude-plugin/marketplace.json` listing exactly the mods in `mods/`;
-3. installs + enables the `ALWAYS_ON` third-party plugin (glanceflow) and removes duplicate installed copies of local mods;
+3. installs + enables any `ALWAYS_ON` third-party plugins (none right now) and removes duplicate installed copies of local mods;
 4. re-enables any mod that a project's settings switch off;
 5. removes `disable-model-invocation: true` from every `~/.claude/skills/*/SKILL.md`, so Claude can always see and call every global skill (third-party updates can re-add it).
 
@@ -74,7 +74,6 @@ Each folder has its own README with details.
 |---|---|---|
 | ponytail | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) | Always-on "lazy senior dev": smallest complete change; `ponytail-review` / `ponytail-audit` |
 | i-have-adhd | [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd) | Always-on output shaping: next action first, numbered steps, one concrete next step |
-| glanceflow | [Antreas-Strb/glanceflow](https://github.com/Antreas-Strb/glanceflow) | Plan/progress tracking tools |
 | filetree | [data-goblin/claude-code-filetree](https://github.com/data-goblin/claude-code-filetree) | IDE-style file tree showing where Claude is working |
 | ui-ux-pro-max | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | Ships 7 design skills (below) as one plugin |
 
