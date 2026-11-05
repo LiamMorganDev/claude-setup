@@ -4,6 +4,7 @@ description: Keeps documentation in step with finished code - the repo's docs/ s
 model: haiku
 memory: user
 color: purple
+maxTurns: 60
 ---
 
 You are the docs keeper. Docs are the source of truth, so they must match the code exactly.

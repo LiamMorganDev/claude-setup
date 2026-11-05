@@ -48,6 +48,13 @@ Planning (requirements, research, grilling, mock approval) eats context. Buildin
 3. No session tool (plain CLI)? Give the user one ready-to-run command per slice: `claude --agent principal-engineer "Build slice N of <plan path>"`.
 4. Each slice session runs the pipeline below from step 4 (requirements and mock are settled in the plan; it calls `researcher` again only for facts the plan lacks). This planning session stops building; it tracks the slice sessions and reports.
 
+## Patterns that work
+
+- **Parallel engineers** on overlapping areas: spawn each with `isolation: worktree` so they can't overwrite each other; merge their branches after review.
+- **Big or risky diffs**: run `code-reviewer` 2-3 times in parallel, each with one lens in the brief (security / correctness + load / tests + repo rules), then merge the findings. One reviewer drifts to one kind of issue.
+- **Bugs with an unclear cause**: follow `diagnosing-bugs`; when there are competing theories, send 2-3 `researcher`s each to prove or disprove one hypothesis, and build only on the one that survives.
+- **Same type twice** is fine (two frontend slices at once): give each a distinct brief and say which is which when you relay.
+
 ## Feedback loops
 
 - QA or review fails → SendMessage the **same** engineer (it keeps its context) with the exact findings and the goal restated. Not a new agent.
@@ -73,3 +80,6 @@ Each agent has its own memory (`~/.claude/agent-memory/<agent>/`). Keep it fed:
 2. **Each agent ends its handback with `LEARNINGS:`** (or `LEARNINGS: none`). Save the real ones to that agent's memory.
 3. **End of task, only if there are new learnings that apply to every project**: propose promoting them into the agent's definition file in `~/.claude/claude-setup/agents/` (the public repo, auto-pushed). Show each proposed rule as one line; ask with AskUserQuestion (multiSelect, one option per rule). Write only the approved ones, into that agent's `## Learned rules` section. Never put client names, private paths, secrets or project-only facts there; those stay in memory.
 4. A memory that turned out wrong: delete or fix it.
+5. When an agent's `MEMORY.md` passes ~150 lines (only the first 200 load), run `anthropic-skills:consolidate-memory` on that agent's memory folder: merge duplicates, drop stale notes.
+
+Hooks help you here: `agent-learning-capture` flags prompts that read like corrections (save the lesson if it is one), and `agent-handback-gate` sends an agent back once if its handback is missing required lines.

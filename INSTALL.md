@@ -92,7 +92,7 @@ Read `$CS/global/settings.template.json`. Replace every `{{HOME}}` with `$HOME_F
 - **`hooks`**: per event, append each hook entry whose `command` isn't already present. Never remove their hooks.
 - **Scalars** (`effortLevel`, `tui`, `enableWorkflows`, `agentPushNotifEnabled`): only if Preferences = Yes.
 - **`permissions.defaultMode` + `skipDangerousModePermissionPrompt`**: only if Permissions = Bypass.
-- **`_optional`**: merge each block only if picked — `statusline` (Status line; if they already have a `statusLine`, ask), `worktree-hook`, `skins` (handled in step 9), `windows-powershell` (Windows only, ask). Never write the `_optional` or `//` keys.
+- **`_optional`**: merge each block only if picked — `statusline` (Status line; if they already have a `statusLine`, ask), `worktree-hook`, `agents` (Agent team: correction-capture + handback-gate hooks), `skins` (handled in step 9), `windows-powershell` (Windows only, ask). Never write the `_optional` or `//` keys.
 - Drop `enabledPlugins` / `extraKnownMarketplaces` entries for third-party plugins they didn't pick.
 - Never add anything that runs `autopush.js`.
 

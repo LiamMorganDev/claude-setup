@@ -18,6 +18,9 @@ const EXPANDED = { plugin: 'claudelets-agent-monitor', key: 'expanded' } as cons
 const TICK = { plugin: 'claudelets-agent-monitor', key: 'tick' } as const
 const FILES_OPEN = { plugin: 'claudelets-agent-monitor', key: 'filesOpen' } as const
 const HISTORY = { plugin: 'claudelets-agent-monitor', key: 'history' } as const
+const TEAM = { plugin: 'claudelets-agent-monitor', key: 'team' } as const
+const LAST_USED = { plugin: 'claudelets-agent-monitor', key: 'lastUsed' } as const
+const LAST_USED_KEY = 'lastUsed'
 
 /** Read-modify-write of the run with compare-and-set, retried when another write landed first. */
 async function updateRun($: EngineInterface, fn: (r: Run) => Run): Promise<Run> {
@@ -457,6 +460,71 @@ export const projectPath = (file: string, cwd: string): string => {
   return f.toLowerCase().startsWith(root.toLowerCase()) ? f.slice(root.length) : baseName(f)
 }
 
+/** The team's order in the roster; any other agent file follows, by name. */
+const TEAM_ORDER = ['principal-engineer', 'ux-designer', 'frontend-engineer', 'backend-engineer', 'code-reviewer', 'qa-tester', 'researcher', 'docs-keeper', 'devops']
+export const sortTeam = (names: string[]): string[] => [...names].sort((a, b) => {
+  const ia = TEAM_ORDER.indexOf(a)
+  const ib = TEAM_ORDER.indexOf(b)
+
+  return ia === -1 && ib === -1 ? a.localeCompare(b) : ia === -1 ? 1 : ib === -1 ? -1 : ia - ib
+})
+
+/** The team: agent files in ~/.claude/agents (top level only), and when each type last ran. */
+async function loadTeam($: EngineInterface) {
+  const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
+  let names: string[] = []
+  if (home) {
+    names = await $.fs.list(`${home}/.claude/agents`)
+      .then(list => list.filter(f => f.kind === 'file' && f.name.endsWith('.md')).map(f => f.name.slice(0, -3)))
+      .catch(() => [])
+  }
+  await $.state.set(TEAM, sortTeam(names))
+  const used = await $.store.get(LAST_USED_KEY).catch(() => undefined)
+  await $.state.set(LAST_USED, used && typeof used === 'object' ? (used as Record<string, number>) : {})
+}
+
+async function markUsed($: EngineInterface, type: string) {
+  const { value: used = {} } = await $.state.get(LAST_USED)
+  const next = { ...used, [type]: Date.now() }
+  await $.state.set(LAST_USED, next)
+  await $.store.set(LAST_USED_KEY, next).catch(() => undefined)
+}
+
+const ago = (ms: number): string =>
+  ms < 60_000 ? 'just now'
+    : ms < 3_600_000 ? `${Math.floor(ms / 60_000)}m ago`
+    : ms < 86_400_000 ? `${Math.floor(ms / 3_600_000)}h ago`
+    : `${Math.floor(ms / 86_400_000)}d ago`
+
+/** A roster line's status and pose: running copies of the type, else when it last ran. The principal is the main session. */
+export const teamStatus = (name: string, rows: AgentRow[], lastUsed: Record<string, number>, now: number): { text: string; pose: Pose } => {
+  if (name === 'principal-engineer') {
+    const main = rows.find(a => a.id === MAIN)
+
+    return { text: 'main session', pose: main && !main.isDone ? 'work' : 'off' }
+  }
+  const live = rows.filter(a => a.id !== MAIN && a.name === name && !a.isDone)
+  if (live.some(a => a.isWaiting)) return { text: 'waiting on you', pose: 'wait' }
+  if (live.length) return { text: live.length > 1 ? `working ×${live.length}` : 'working', pose: 'work' }
+  const at = lastUsed[name]
+
+  return at === undefined ? { text: 'never used', pose: 'off' } : { text: `idle · ${ago(now - at)}`, pose: 'off' }
+}
+
+/** Row names, numbered `#1`, `#2`… where two rows share an agent type. */
+export const rowLabels = (rows: AgentRow[]): Record<string, string> => {
+  const total: Record<string, number> = {}
+  for (const a of rows) total[a.name] = (total[a.name] ?? 0) + 1
+  const seen: Record<string, number> = {}
+  const out: Record<string, string> = {}
+  for (const a of rows) {
+    seen[a.name] = (seen[a.name] ?? 0) + 1
+    out[a.id] = total[a.name]! > 1 ? `${a.name} #${seen[a.name]}` : a.name
+  }
+
+  return out
+}
+
 const WRITES = new Set(['Write', 'Edit', 'NotebookEdit'])
 /** How many files the unfolded list shows before "+N more" */
 const FILES_SHOWN = 4
@@ -465,6 +533,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     startPoller($, Number(options.pollSeconds ?? 10))
     await showDay($, dayKey(Date.now()))
+    await loadTeam($).catch(() => undefined)
     await $.command.register({
       name: 'monitor',
       description: 'Show the live agent monitor pane (/monitor off hides it)',
@@ -536,6 +605,7 @@ export const register: Register = (on, options) => {
     })
     if (latest.agents[id]) $.ui.status(summary(latest))
     startTicker($)
+    await markUsed($, e.subagentType).catch(() => undefined)
 
     return spawned
   })
@@ -655,14 +725,50 @@ export const register: Register = (on, options) => {
     const { value: expanded = [] } = await $.state.get(EXPANDED)
     const { value: filesOpen = false } = await $.state.get(FILES_OPEN)
     const { value: history } = await $.state.get(HISTORY)
+    const { value: team = [] } = await $.state.get(TEAM)
+    const { value: lastUsed = {} } = await $.state.get(LAST_USED)
     await $.state.get(TICK)
     const now = Date.now()
     const cols = Math.max(24, e.props.bodyColumns)
+
+    // The team roster: every agent in ~/.claude/agents, faded while it isn't running.
+    const liveRows = Object.values(r.agents)
+    const rosterBlock = team.length
+      ? (
+        <Box flexDirection="column">
+          <Text dimColor>{'─'.repeat(Math.min(cols, 48))}</Text>
+          <Text>
+            <Text bold>Team</Text>
+            <Text dimColor>{` (${team.length})`}</Text>
+          </Text>
+          {team.map((name, i) => {
+            const s = teamStatus(name, liveRows, lastUsed, now)
+            const level = s.pose === 'work' ? 'success' : s.pose === 'wait' ? 'warning' : undefined
+            const line = (
+              <Box flexDirection="row" justifyContent="space-between" gap={1} flexGrow={1} flexShrink={1}>
+                <Text wrap="truncate-end" dimColor={s.pose === 'off'}>{`${Svg ? '' : s.pose === 'off' ? '○ ' : '● '}${name}`}</Text>
+                <Text color={level} dimColor={!level}>{s.text}</Text>
+              </Box>
+            )
+            if (!Svg) return <Box key={`team:${name}`}>{line}</Box>
+            const sprite = { role: name, pose: s.pose, phase: i }
+
+            return (
+              <Box key={`team:${name}`} flexDirection="row" alignItems="center" gap={1}>
+                <Svg source={claudeletSvg(sprite)} alt={claudeletAlt(sprite)} width={32} height={24} />
+                {line}
+              </Box>
+            )
+          })}
+        </Box>
+      )
+      : null
 
     if (!r.agents[MAIN]) {
       return (
         <Box flexDirection="column">
           <Text dimColor>Waiting for your next request…</Text>
+          {rosterBlock}
         </Box>
       )
     }
@@ -709,6 +815,8 @@ export const register: Register = (on, options) => {
     }
     visit(MAIN)
     for (const id of r.order) if (!ordered.some(a => a.id === id) && r.agents[id]) ordered.push(r.agents[id]!)
+    // numbered in spawn order, so #1 is the first one started
+    const labels = rowLabels(r.order.map(id => r.agents[id]).filter((a): a is AgentRow => a !== undefined))
 
     const runningChildren = (id: string) =>
       ordered.filter(a => a.parentId === id && !a.isDone).length
@@ -786,6 +894,7 @@ export const register: Register = (on, options) => {
         <Text dimColor>{'─'.repeat(Math.min(cols, 48))}</Text>
         {ordered.map((a, i) => {
           const depth = depthOf(a)
+          const label = labels[a.id] ?? a.name
           // With a sprite the Box margin indents the row, so the text carries no indent of its own.
           const indent = Svg ? '' : '  '.repeat(depth)
           const gutter = Svg ? '' : `${indent}  `
@@ -812,8 +921,9 @@ export const register: Register = (on, options) => {
             <Box flexDirection="row" justifyContent="space-between" gap={1}>
               <Text wrap="truncate-end" dimColor={isFolded}>
                 {indent}
+                {!Svg && depth > 0 ? <Text dimColor>└ </Text> : null}
                 {Svg ? null : <Text color={a.isWaiting ? 'warning' : color}>{a.isDone ? '✓ ' : a.isWaiting ? '✋ ' : '● '}</Text>}
-                <Text bold>{a.name}</Text>
+                <Text bold>{label}</Text>
                 {badge ? <Text dimColor>{` ${badge}`}</Text> : null}
               </Text>
               <Text dimColor>{stats.join(' · ')}</Text>
@@ -855,11 +965,13 @@ export const register: Register = (on, options) => {
 
           return (
             <Box key={a.id} flexDirection="row" alignItems="center" gap={1} marginLeft={2 * depth} marginBottom={1}>
+              {depth > 0 ? <Text dimColor>└</Text> : null}
               <Svg source={claudeletSvg(sprite)} alt={claudeletAlt(sprite)} width={44} height={33} />
               {lines}
             </Box>
           )
         })}
+        {rosterBlock}
         {historyBlock}
       </Box>
     )

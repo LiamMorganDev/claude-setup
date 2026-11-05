@@ -5,8 +5,8 @@
  * reloads on every pane redraw, which made every sprite flash.
  */
 
-/** `rest`: a subagent finished while the run goes on; `done`: the whole run finished, so it celebrates */
-export type Pose = 'work' | 'think' | 'wait' | 'rest' | 'done' | 'error'
+/** `rest`: a subagent finished while the run goes on; `done`: the whole run finished, so it celebrates; `off`: a team agent not running now (the roster), faded */
+export type Pose = 'work' | 'think' | 'wait' | 'rest' | 'done' | 'error' | 'off'
 
 const CLAY = '#D97757'
 const CLAY_DARK = '#B85F42'
@@ -46,11 +46,29 @@ const HATS: Record<string, string> = {
   fork: px(5, 5, 8, 2, '#E04F5F') + px(7, 5, 2, 2, '#F2C14E') + px(11, 5, 1, 2, '#3E6FB0') + px(8, 4, 2, 1, '#888') + px(6, 3, 6, 1, '#3E6FB0'),
   // party hat
   teammate: px(7, 5, 4, 2, '#B594F5') + px(8, 3, 2, 2, '#B594F5') + px(8, 2, 2, 1, '#F2C14E'),
+  // the agent team (~/.claude/agents): captain's cap
+  'principal-engineer': px(5, 4, 8, 2, '#2C3E66') + px(5, 5, 8, 1, '#F2C14E') + px(4, 6, 10, 1, '#1E2B47') + px(8, 4, 2, 1, '#F2C14E'),
+  // pink beret
+  'ux-designer': px(5, 5, 8, 2, '#E26DA6') + px(6, 4, 6, 1, '#E26DA6') + px(12, 4, 1, 1, '#B84A82'),
+  // headphones
+  'frontend-engineer': px(5, 3, 8, 1, '#3E6FB0') + px(4, 4, 1, 2, '#3E6FB0') + px(13, 4, 1, 2, '#3E6FB0') + px(3, 6, 2, 3, '#2C5288') + px(13, 6, 2, 3, '#2C5288'),
+  // miner's helmet with lamp
+  'backend-engineer': px(5, 4, 8, 3, '#4FA06B') + px(4, 6, 10, 1, '#3B7F53') + px(8, 4, 2, 2, '#F2E88A'),
+  // flat cap + monocle
+  'code-reviewer': px(5, 5, 8, 2, '#7A6F66') + px(11, 6, 3, 1, '#5E554E') + px(10, 7, 3, 1, '#F2C14E') + px(10, 10, 3, 1, '#F2C14E') + px(10, 8, 1, 2, '#F2C14E') + px(12, 8, 1, 2, '#F2C14E'),
+  // lab goggles
+  'qa-tester': px(5, 5, 8, 1, '#F3EEE6') + px(4, 6, 10, 1, '#444') + px(5, 7, 3, 3, '#9AD1E8') + px(10, 7, 3, 3, '#9AD1E8'),
+  // deerstalker
+  researcher: px(5, 4, 8, 3, '#A0703C') + px(7, 4, 1, 3, '#7E5428') + px(10, 4, 1, 3, '#7E5428') + px(4, 6, 1, 2, '#7E5428') + px(13, 6, 1, 2, '#7E5428') + px(8, 3, 2, 1, '#7E5428'),
+  // mortarboard
+  'docs-keeper': px(3, 4, 12, 1, '#2A2730') + px(6, 5, 6, 2, '#2A2730') + px(14, 5, 1, 2, '#F2C14E'),
+  // fire helmet
+  devops: px(5, 4, 8, 3, '#D2402F') + px(3, 6, 12, 1, '#A8301F') + px(8, 4, 2, 2, '#F2C14E'),
   // baseball cap, for any other agent type
   other: px(5, 5, 8, 2, '#4FA06B') + px(12, 6, 3, 1, '#3B7F53'),
 }
 
-type Prop = 'read' | 'edit' | 'bash' | 'grep' | 'web' | 'todo' | 'agent'
+type Prop = 'read' | 'edit' | 'bash' | 'grep' | 'web' | 'todo' | 'agent' | 'palette' | 'laptop' | 'gear' | 'checklist' | 'quill' | 'wrench'
 
 // Held at the right arm, x 14..19.
 const PROPS: Record<Prop, (b: string) => string> = {
@@ -60,6 +78,12 @@ const PROPS: Record<Prop, (b: string) => string> = {
   grep: () => px(14, 7, 3, 1, '#9AD1E8') + px(14, 8, 1, 2, '#9AD1E8') + px(16, 8, 1, 2, '#9AD1E8') + px(14, 10, 3, 1, '#9AD1E8') + px(15, 8, 1, 2, '#CFEAF5') + px(17, 11, 1, 1, '#8B5A3C') + px(18, 12, 1, 1, '#8B5A3C'),
   web: () => px(15, 7, 3, 1, '#4F9BD8') + px(14, 8, 5, 3, '#4F9BD8') + px(15, 11, 3, 1, '#4F9BD8') + px(15, 8, 2, 1, '#6CC17A') + px(16, 10, 2, 1, '#6CC17A'),
   todo: () => px(14, 7, 5, 5, '#C99A6B') + px(15, 6, 3, 1, '#9AA0A6') + px(15, 8, 3, 1, '#F3EEE6') + px(15, 10, 3, 1, '#F3EEE6'),
+  palette: () => px(14, 8, 5, 3, '#E8D2A6') + px(15, 8, 1, 1, '#E04F5F') + px(17, 8, 1, 1, '#3E6FB0') + px(16, 10, 1, 1, '#7BD88F') + px(18, 9, 1, 1, '#F2C14E'),
+  laptop: () => px(14, 7, 5, 3, '#5B5664') + px(15, 8, 3, 1, '#9AD1E8') + px(13, 10, 7, 1, '#8F8783'),
+  gear: () => px(15, 7, 3, 3, '#9AA0A6') + px(16, 6, 1, 1, '#9AA0A6') + px(16, 10, 1, 1, '#9AA0A6') + px(14, 8, 1, 1, '#9AA0A6') + px(18, 8, 1, 1, '#9AA0A6') + px(16, 8, 1, 1, '#5B5664'),
+  checklist: () => px(14, 7, 5, 5, '#F3EEE6') + px(15, 9, 1, 1, '#4FA06B') + px(16, 10, 1, 1, '#4FA06B') + px(17, 8, 1, 2, '#4FA06B'),
+  quill: () => px(17, 5, 1, 2, '#F3EEE6') + px(16, 7, 1, 2, '#F3EEE6') + px(15, 9, 1, 2, '#8B5A3C'),
+  wrench: () => px(15, 6, 1, 1, '#9AA0A6') + px(17, 6, 1, 1, '#9AA0A6') + px(15, 7, 3, 1, '#9AA0A6') + px(16, 8, 1, 4, '#9AA0A6'),
   agent: b => px(14, 8, 1, 2, '#E04F5F') + px(15, 7, 1, 4, '#E04F5F') + px(16, 6, 2, 6, '#F3EEE6') + px(18, 7, 1, 1, '#F2C14E', blink('0.6s', '1;0', b)) + px(18, 10, 1, 1, '#F2C14E', blink('0.6s', '0;1', b)),
 }
 
@@ -89,6 +113,8 @@ export const hatFor = (role: string): string =>
 
 const ROLE_PROPS: Record<string, Prop> = {
   main: 'todo', Explore: 'grep', Plan: 'edit', 'general-purpose': 'bash', 'claude-code-guide': 'read',
+  'principal-engineer': 'todo', 'ux-designer': 'palette', 'frontend-engineer': 'laptop', 'backend-engineer': 'gear',
+  'code-reviewer': 'grep', 'qa-tester': 'checklist', researcher: 'read', 'docs-keeper': 'quill', devops: 'wrench',
 }
 
 export const propFor = (role: string, tool: string | undefined): Prop | undefined => {
@@ -127,9 +153,11 @@ export function claudeletSvg({ role, pose, tool, phase = 0 }: ClaudeletArgs): st
     extra = px(2, 3, 1, 1, '#F2C14E', blink('0.8s', '1;0', b)) + px(16, 2, 1, 1, '#F2C14E', blink('0.8s', '0;1', b))
       + px(15, 5, 1, 1, '#7BD88F', blink('0.8s', '1;0', b)) + px(1, 6, 1, 1, '#7BD88F', blink('0.8s', '0;1', b))
     bob = bobble('0 0;0 -1;0 0;0 0', '0.8s', '0s', '3')
-  } else if (pose === 'rest') {
-    // content squint, standing still
+  } else if (pose === 'rest' || pose === 'off') {
+    // content squint, standing still, holding its trade tool
     eyes = px(6, 9, 2, 1, EYE) + px(10, 9, 2, 1, EYE)
+    const p = propFor(role, undefined)
+    if (p) prop = PROPS[p](b)
   } else {
     // open eyes that blink every few seconds
     const open = '1;1;1;1;1;1;1;0'
@@ -159,7 +187,7 @@ export function claudeletSvg({ role, pose, tool, phase = 0 }: ClaudeletArgs): st
       + px(16, 1, 1, 1, EYE, blink('1.2s', '1;0;0', b)) + px(17, 1, 1, 1, EYE, blink('1.2s', '0;1;0', b)) + px(18, 1, 1, 1, EYE, blink('1.2s', '0;0;1', b))
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 15" shape-rendering="crispEdges">`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 15" shape-rendering="crispEdges"${pose === 'off' ? ' opacity="0.45"' : ''}>`
     + `<g>${bob}${px(4, 7, 10, 5, body)}${px(4, 11, 10, 1, shade)}${arms}${eyes}${legs}${hat}${extra}</g>${prop}</svg>`
 }
 
@@ -170,4 +198,5 @@ export const claudeletAlt = ({ role, pose, tool }: ClaudeletArgs): string =>
     : pose === 'wait' ? `${role} Claude waiting on you`
     : pose === 'rest' ? `${role} Claude finished`
     : pose === 'done' ? `${role} Claude done`
+    : pose === 'off' ? `${role} Claude idle`
     : `${role} Claude stopped on an error`

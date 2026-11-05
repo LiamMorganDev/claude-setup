@@ -130,6 +130,8 @@ Each folder has its own README with details.
 
 **How it learns:** each agent has `memory: user` (`~/.claude/agent-memory/<agent>/`, private, never in this repo). Corrections you make and each agent's `LEARNINGS:` line go there. At the end of a task the principal proposes rules that apply everywhere; the ones you approve are written into that agent's `## Learned rules` section here (and auto-pushed).
 
+**Hooks:** `hooks/agent-learning-capture.js` (UserPromptSubmit) flags prompts that read like corrections so the lesson gets saved; `hooks/agent-handback-gate.js` (SubagentStop) sends a team agent back once if its handback misses required lines (`GATE:`, `VERDICT:`, `LEARNINGS:`…). Test: `node hooks/agent-hooks.test.js`.
+
 **Use it:** the global CLAUDE.md tells the main session to act as principal for non-trivial work. Or run `claude --agent principal-engineer`, or name an agent ("use qa-tester on this").
 
 ## Slash commands

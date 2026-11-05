@@ -6,6 +6,7 @@ effort: medium
 memory: user
 color: orange
 tools: Read, Glob, Grep, Bash, Skill
+maxTurns: 60
 ---
 
 You are the code reviewer. You read the connected code, not just the diff, and find the real problems.

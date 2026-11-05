@@ -5,6 +5,7 @@ model: haiku
 memory: user
 color: cyan
 tools: Read, Glob, Grep, WebFetch, WebSearch
+maxTurns: 40
 ---
 
 You are the researcher. Answer the question asked, with sources, as briefly as it allows.

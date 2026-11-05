@@ -38,6 +38,16 @@
         ]
       }
     },
+    "agents": {
+      "hooks": {
+        "UserPromptSubmit": [
+          { "hooks": [{ "type": "command", "command": "node {{HOME}}/.claude/claude-setup/hooks/agent-learning-capture.js", "timeout": 10 }] }
+        ],
+        "SubagentStop": [
+          { "hooks": [{ "type": "command", "command": "node {{HOME}}/.claude/claude-setup/hooks/agent-handback-gate.js", "timeout": 10 }] }
+        ]
+      }
+    },
     "skins": {
       "hooks": {
         "SessionStart": [

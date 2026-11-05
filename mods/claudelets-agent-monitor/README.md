@@ -1,10 +1,10 @@
 # claudelets-agent-monitor
 
-Live pane for the request in progress: how far along it is (%), tokens used, and one row per agent and subagent saying what it is doing right now. Each agent gets a small pixel Claude dressed for its job.
+Live pane for the request in progress: how far along it is (%), tokens used, and one row per agent and subagent saying what it is doing right now. Each agent gets a small pixel Claude dressed for its job; two of the same type are numbered (#1, #2) and children of children nest under their parent with a └. Below the live rows, a **Team** roster lists every agent in `~/.claude/agents` (the claude-setup agent team has its own costumes): working, waiting on you, idle · last used, or never used, faded while idle.
 
 - **Use:** `/monitor` opens the pane.
 - **Notes:** Secrets in tool arguments (API keys, tokens) are masked before anything is shown.
-- **Version:** 0.8.0
+- **Version:** 0.9.0
 
 <!-- screenshot: add mods/claudelets-agent-monitor/screenshot.png and reference it here -->
 

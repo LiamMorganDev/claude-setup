@@ -78,6 +78,10 @@ declare module 'claude-code' {
       /** Whether the finished request's file list is unfolded */
       filesOpen: boolean
       history: HistoryView
+      /** Agent types in ~/.claude/agents, roster order */
+      team: string[]
+      /** Epoch ms each agent type was last spawned (persisted in the store) */
+      lastUsed: Record<string, number>
     }
   }
 }

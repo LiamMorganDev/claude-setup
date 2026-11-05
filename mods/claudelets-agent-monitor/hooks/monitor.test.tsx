@@ -1,5 +1,7 @@
 import { expect, test } from 'claude-code/testing'
-import { asksQuestion, dayKey, projectPath, shiftDay, contextGauge, describeCall, parseAccountUsage, forecastFull, formatDuration, gaugeRuns, limitGauge, modelBadge } from './register'
+import { asksQuestion, dayKey, projectPath, shiftDay, contextGauge, describeCall, parseAccountUsage, forecastFull, formatDuration, gaugeRuns, limitGauge, modelBadge, rowLabels, sortTeam, teamStatus } from './register'
+import { claudeletAlt, claudeletSvg, hatFor } from './claudelet'
+import type { AgentRow } from '../types'
 
 async function drain<R>(stream: AsyncGenerator<unknown, R> & { result: Promise<R> }): Promise<R> {
   for await (const _ of stream) { /* read to the end */ }
@@ -379,4 +381,29 @@ test('a finished request shows its summary and files, and lands in history', asy
   await ui.press({ key: 'day-prev' })
   expect(await ui.find({ text: /No requests this day/ })).toBeDefined()
   await ui.unmount()
+})
+
+test('team roster: order, status per type, duplicates numbered', () => {
+  expect(sortTeam(['zeta', 'qa-tester', 'principal-engineer', 'alpha'])).toEqual(['principal-engineer', 'qa-tester', 'alpha', 'zeta'])
+  const row = (id: string, name: string, extra: Partial<AgentRow> = {}): AgentRow => ({
+    id, name, description: '', isDone: false, tokens: 0, doing: '', steps: [], isThinking: false, isError: false, ...extra,
+  })
+  const rows = [row('main', 'main'), row('a', 'frontend-engineer'), row('b', 'frontend-engineer'), row('c', 'qa-tester', { isWaiting: true }), row('d', 'researcher', { isDone: true })]
+  const now = 10_000_000
+  expect(teamStatus('frontend-engineer', rows, {}, now)).toEqual({ text: 'working ×2', pose: 'work' })
+  expect(teamStatus('qa-tester', rows, {}, now)).toEqual({ text: 'waiting on you', pose: 'wait' })
+  expect(teamStatus('researcher', rows, { researcher: now - 5 * 60_000 }, now)).toEqual({ text: 'idle · 5m ago', pose: 'off' })
+  expect(teamStatus('devops', rows, {}, now)).toEqual({ text: 'never used', pose: 'off' })
+  expect(teamStatus('principal-engineer', rows, {}, now)).toEqual({ text: 'main session', pose: 'work' })
+  expect(rowLabels(rows)).toEqual({ main: 'main', a: 'frontend-engineer #1', b: 'frontend-engineer #2', c: 'qa-tester', d: 'researcher' })
+})
+
+test('team claude-lets: own hat per role, idle prop, faded when off', () => {
+  const roles = ['principal-engineer', 'ux-designer', 'frontend-engineer', 'backend-engineer', 'code-reviewer', 'qa-tester', 'researcher', 'docs-keeper', 'devops']
+  expect(new Set(roles.map(hatFor)).size).toBe(roles.length)
+  expect(roles.every(r => hatFor(r) !== hatFor('some-other-agent'))).toBe(true)
+  const off = claudeletSvg({ role: 'devops', pose: 'off' })
+  expect(off.includes('opacity="0.45"')).toBe(true)
+  expect(off.length > claudeletSvg({ role: 'some-other-agent', pose: 'off' }).length).toBe(true)
+  expect(claudeletAlt({ role: 'devops', pose: 'off' })).toBe('devops Claude idle')
 })
