@@ -61,7 +61,6 @@ Each folder has its own README with details.
 | Mod | What it does | Command |
 |---|---|---|
 | [claudelets-agent-monitor](mods/claudelets-agent-monitor/) | Live pane of the current request: % complete, tokens, and what each agent/subagent is doing, with a pixel Claude per agent dressed for its job | `/monitor` |
-| [win-jar](mods/win-jar/) | Every finished step from every chat goes in a "shipped today" jar: pane, streaks, a toast per win | `/wins` |
 | [unshipped-nag](mods/unshipped-nag/) | Toast when changes sit uncommitted 30+ min or commits are unpushed (max every 30 min) | – |
 | [lockstep-guards](mods/lockstep-guards/) | Flags `.env`/`.env.example` drift and schema/types/Zod changes made out of lockstep | – |
 | [bat-flyby](mods/bat-flyby/) | A Dracula bat flies across the band above the prompt when a `git push` succeeds | – |

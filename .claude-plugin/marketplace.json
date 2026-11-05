@@ -33,11 +33,6 @@
       "name": "unshipped-nag",
       "source": "./mods/unshipped-nag",
       "description": "Toast after a turn when changes sit uncommitted for 30+ min or commits are not pushed (at most every 30 min)"
-    },
-    {
-      "name": "win-jar",
-      "source": "./mods/win-jar",
-      "description": "Collects every finished step from all chats into a shipped-today jar: /wins pane, streaks, a toast per win"
     }
   ]
 }
