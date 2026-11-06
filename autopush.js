@@ -35,8 +35,12 @@ try {
     git('-c', `user.email=${EMAIL}`, '-c', 'user.name=LiamMorganDev', 'commit', '-q', '-m', subject, '-m', body)
   }
 
-  // push anything unpushed (also retries a push that failed last time), without blocking the hook
+  // push anything unpushed (also retries a push that failed last time), without blocking the hook.
+  // Rebase on origin first: a commit made elsewhere would otherwise reject every push forever.
   if (git('rev-list', '--count', '@{u}..HEAD') !== '0') {
-    spawn('git', ['push', '-q'], { cwd: DIR, detached: true, stdio: 'ignore', windowsHide: true }).unref()
+    const script = `const { execFileSync: x } = require('child_process'); const o = { cwd: ${JSON.stringify(DIR)}, stdio: 'ignore', windowsHide: true }
+try { x('git', ['pull', '--rebase', '-q'], o) } catch { try { x('git', ['rebase', '--abort'], o) } catch {} ; process.exit(0) }
+x('git', ['push', '-q'], o)`
+    spawn(process.execPath, ['-e', script], { cwd: DIR, detached: true, stdio: 'ignore', windowsHide: true }).unref()
   }
 } catch {}
