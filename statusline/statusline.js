@@ -60,12 +60,6 @@ process.stdin.on('end', () => {
         parts.push(dirty ? `${branch} \x1b[33m●${dirty}\x1b[0m` : branch)
       }
     } catch {}
-    // pb-light mod's last live PocketBase vs pb_schema.json check for this repo
-    try {
-      const root = git(['rev-parse', '--show-toplevel']).trim().replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
-      const pb = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', 'pb-light.json'), 'utf8'))[root]
-      if (pb) parts.push(`\x1b[${pb.includes('●') ? 32 : pb.includes('▲') ? 33 : 31}m${pb.replace(/ · \/pb-drift$/, '')}\x1b[0m`)
-    } catch {}
   }
 
   const remaining = input.context_window?.remaining_percentage

@@ -1,5 +1,5 @@
 // Update an installed claude-setup: pull the latest repo, then tidy what the pull
-// left behind on this machine (deleted mods, skills, commands, hooks, status line).
+// left behind on this machine (deleted mods, dead links, hooks, status line), then mirror.js.
 //   node ~/.claude/claude-setup/update.js
 // Never touches anything that isn't from this repo. Settings are backed up before any edit.
 const fs = require('fs')
@@ -11,7 +11,6 @@ const CS = __dirname
 const CLAUDE = path.join(os.homedir(), '.claude')
 const SETTINGS = path.join(CLAUDE, 'settings.json')
 const git = (...args) => execFileSync('git', ['-C', CS, ...args], { encoding: 'utf8' }).trim()
-const lf = s => s.replace(/\r\n/g, '\n')
 const inRepo = p => path.resolve(p).toLowerCase().startsWith(path.resolve(CS).toLowerCase() + path.sep)
 const isLink = p => { try { return fs.lstatSync(p).isSymbolicLink() } catch { return false } }
 const done = []
@@ -25,9 +24,6 @@ try {
   process.exit(1)
 }
 const after = git('rev-parse', 'HEAD')
-const changed = before === after ? [] : git('diff', '--name-status', before, after).split('\n').filter(Boolean).map(l => l.split('\t'))
-// untrimmed, so it compares equal to an untouched copy
-const show = (rev, file) => { try { return lf(execFileSync('git', ['-C', CS, 'show', `${rev}:${file}`], { encoding: 'utf8' })) } catch { return null } }
 
 // 2. leftover mod folders: git removes tracked files, but untracked ones (caches, node_modules) keep the folder
 const MODS = path.join(CS, 'mods')
@@ -55,33 +51,9 @@ for (const parent of ['skills', 'commands']) {
   }
 }
 
-// 4. commands copied in (Windows installs copy rather than link): follow the repo
-// only where the copy is still the untouched old version; new commands are copied in
-const CMDS = path.join(CLAUDE, 'commands')
-if (fs.existsSync(CMDS) && !isLink(CMDS)) {
-  for (const [status, file, renamed] of changed) {
-    const rel = renamed ?? file
-    if (!/^commands\/[^/]+\.md$/.test(file) && !/^commands\/[^/]+\.md$/.test(rel)) continue
-    const dest = path.join(CMDS, path.basename(file))
-    if (isLink(dest)) continue
-    const mine = fs.existsSync(dest) ? lf(fs.readFileSync(dest, 'utf8')) : null
-    const old = show(before, file)
-    if (status === 'A') {
-      if (mine === null) { fs.copyFileSync(path.join(CS, file), dest); done.push(`added command /${path.basename(file, '.md')}`) }
-    } else if (mine === null) {
-      continue
-    } else if (mine !== old) {
-      done.push(`kept your edited ~/.claude/commands/${path.basename(file)} (repo version changed: check by hand)`)
-    } else if (status === 'D' || status.startsWith('R')) {
-      fs.unlinkSync(dest)
-      done.push(`removed command /${path.basename(file, '.md')}`)
-      if (status.startsWith('R')) fs.copyFileSync(path.join(CS, rel), path.join(CMDS, path.basename(rel)))
-    } else {
-      fs.copyFileSync(path.join(CS, file), dest)
-      done.push(`updated command /${path.basename(file, '.md')}`)
-    }
-  }
-}
+// 4. CLAUDE.md, settings, scripts, skill/mod lists: repo → this machine where the pull changed them
+let mirrored = []
+try { mirrored = require('./mirror').sync() } catch (e) { done.push(`mirror.js failed: ${e.message}`) }
 
 // 5. settings: drop hooks / status line that run a claude-setup file that no longer exists
 const deadFile = cmd => {
@@ -117,7 +89,6 @@ try {
 const log = before === after ? [] : git('log', '--format=  %s', `${before}..${after}`).split('\n')
 console.log(before === after ? '\nAlready up to date.' : `\nPulled ${log.length} commit(s):\n${log.join('\n')}`)
 if (done.length) console.log(`\nCleaned up:\n${done.map(d => `  ${d}`).join('\n')}`)
-const merge = changed.map(c => c.at(-1)).filter(f => f.startsWith('global/'))
-if (merge.length) console.log(`\nChanged, not applied (you merged these at install): ${merge.join(', ')}\n  Ask Claude: "re-merge the claude-setup global/ changes since ${before.slice(0, 7)}"`)
+if (mirrored.length) console.log(`\nMirrored:\n${mirrored.map(d => `  ${d}`).join('\n')}`)
 console.log('\nThird-party plugins/skills/skins update separately: see INSTALL.md → Update.')
 console.log('Start a new session to load the changes.')

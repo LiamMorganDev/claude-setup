@@ -1,7 +1,8 @@
-// Commits and pushes any change in this repo to GitHub (LiamMorganDev/claude-setup).
-// Run by the Stop and SessionStart hooks in ~/.claude/settings.json, so edits by Claude
-// or by hand both get pushed. Owner-only: does nothing unless ~/.claude/.claude-setup-autopush
-// exists (INSTALL.md never creates it, so installs never auto-commit or push).
+// Keeps this repo (LiamMorganDev/claude-setup) and this machine's setup in step.
+// Run by the Stop and SessionStart hooks in ~/.claude/settings.json: on SessionStart it pulls
+// what my other devices pushed; every run mirror.js syncs CLAUDE.md, settings, scripts and
+// skill/mod lists both ways; then any change is committed and pushed.
+// Only runs where ~/.claude/.claude-setup-autopush exists (my own devices).
 const { execFileSync, spawn } = require('child_process')
 const fs = require('fs')
 const os = require('os')
@@ -13,6 +14,18 @@ const MODS = path.join(DIR, 'mods')
 const EMAIL = '23473849+LiamMorganDev@users.noreply.github.com'
 if (!fs.existsSync(path.join(os.homedir(), '.claude', '.claude-setup-autopush'))) process.exit(0)
 const git = (...args) => execFileSync('git', args, { cwd: DIR, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+
+let event
+try { event = JSON.parse(fs.readFileSync(0, 'utf8')).hook_event_name } catch {}
+if (event === 'SessionStart') {
+  try { execFileSync('git', ['pull', '--rebase', '--autostash', '-q'], { cwd: DIR, stdio: 'ignore', windowsHide: true, timeout: 20000 }) }
+  catch { try { git('rebase', '--abort') } catch {} }
+}
+try {
+  const out = require('./mirror').sync()
+  // SessionStart output reaches Claude, e.g. skills to install that another device added
+  if (out.length) console.log(`claude-setup mirror:\n${out.map(l => `  ${l}`).join('\n')}`)
+} catch {}
 
 try {
   // a mod with its own .git is someone else's (e.g. filetree): keep it out

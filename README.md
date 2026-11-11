@@ -1,8 +1,8 @@
 # claude-setup
 
-My complete [Claude Code](https://claude.com/claude-code) setup: my own mods, skills, slash commands, hooks, status line and global `CLAUDE.md`, plus links to every third-party plugin and skill I run.
+A live mirror of my [Claude Code](https://claude.com/claude-code) setup: my mods, agents, skills, slash commands, hooks, status line, global `CLAUDE.md` and `settings.json`, plus the list of third-party plugins and skills I run. It keeps itself in step across my devices; nothing here is edited by hand.
 
-**To install it, give any Claude Code session this repo's link and say "install this".** It follows [INSTALL.md](INSTALL.md): asks which parts you want, backs up your config, then installs and verifies everything. Works on Windows, macOS and Linux.
+**New device:** give a Claude Code session this repo's link and say "install this". It follows [INSTALL.md](INSTALL.md).
 
 ```
 Install my Claude setup from https://github.com/LiamMorganDev/claude-setup — follow its INSTALL.md.
@@ -10,195 +10,70 @@ Install my Claude setup from https://github.com/LiamMorganDev/claude-setup — f
 
 ---
 
+## How it stays current
+
+Two hooks in `settings.json` run [`autopush.js`](autopush.js) (only on devices with `~/.claude/.claude-setup-autopush`):
+
+1. **SessionStart:** `git pull --rebase`, so changes from my other devices arrive.
+2. **Every run (SessionStart + Stop):** [`mirror.js`](mirror.js) syncs the files below between `~/.claude` and this repo. Whichever side changed since the last sync wins; both changed → this machine wins. The previous live file is backed up to `~/.claude/backups/claude-setup-mirror/`.
+3. Any change is committed and pushed.
+
+| Live on the machine | Repo copy | Notes |
+|---|---|---|
+| `~/.claude/CLAUDE.md` | `global/CLAUDE.md` | |
+| `~/.claude/settings.json` | `global/settings.json` | home path → `{{HOME}}`; `CLAUDE_CODE_PLUGIN_DIRS` stays per machine |
+| `~/.claude/scripts/*` | `global/scripts/*` | e.g. `docker-up.ps1` |
+| `~/.claude/skills/skin/SKILL.md` | `skins/windows/SKILL.md` | Windows `/skin` patch |
+| third-party skills in `~/.claude/skills` | `global/skills.json` | name → source repo; missing ones are reported to Claude at session start |
+| third-party mods in `mods/` (own `.git`) | `global/mods.json` | name → clone URL; missing ones are cloned |
+
+Everything else is linked, so edits land in the repo directly. [`sync.js`](sync.js) (SessionStart) handles that:
+
+- loads every folder in `mods/` from disk (`CLAUDE_CODE_PLUGIN_DIRS`, hot-reloaded) and keeps `.claude-plugin/marketplace.json` listing my own;
+- installs any plugin enabled in `settings.json` that this machine is missing;
+- links `agents/`, `commands/` and `skills/*` into `~/.claude` where absent;
+- re-enables a mod a project switches off, and strips `disable-model-invocation: true` from global skills.
+
 ## What's in here
 
-| Part | Where | What it is |
-|---|---|---|
-| [Mods](#mods-mine) | `mods/` | 10 Claude Code plugins I wrote: side panes, status rows, toasts and guard hooks |
-| [Skills](#skills) | `skills/ui-build/`, `skills/ci-watch/` | My `/ui-build` skill (chains the UI skills below into one flow) and `ci-watch` (watches + fixes GitHub CI after a push to `main`) |
-| [Agents](#agent-team) | `agents/` | A 9-agent team (principal, ux, frontend, backend, reviewer, QA, researcher, docs, devops) that learns my preferences into its own memory |
-| [Commands](#slash-commands) | `commands/` | `/commit`, `/self-review`, `/ui-proto`, `/pb-drift` |
-| [Global CLAUDE.md](#global-claudemd) | `global/CLAUDE.md` | My cross-project rules, generalised (no personal or project-specific bits) |
-| [Settings](#settings) | `global/settings.template.json` | Hooks, plugins, marketplaces and preferences, merged into yours on install |
-| [Status line](#status-line) | `statusline/statusline.js` | `🦇 model │ branch ●dirty │ ▓▓░░ 80% ctx`, themed by the active skin |
-| [Worktree hook](#worktree-merge-reminder) | `hooks/worktree-merge-reminder.js` | After a push to `main`: tells Claude to run `ci-watch`, and to clean up merged git worktrees. After a push to `release` (repos with `pb_schema.json`): tells Claude to run `/pb-align` |
-| [Skins patch](#skins) | `skins/windows/` | Windows fixes for [claude-skins](https://github.com/basicScandal/claude-skins) |
-| Plumbing | `sync.js`, `.claude-plugin/marketplace.json` | Loads every mod from disk each session; also lets you install mods one by one |
-| Owner-only | `autopush.js` | Auto-commits and pushes this repo for me. **Never installed for anyone else.** |
+### Mods (mine)
 
-## How it fits together
-
-```
-~/.claude/
-├── claude-setup/            ← this repo (git clone)
-│   ├── mods/<mod>/          ← loaded straight from disk by sync.js (no plugin install)
-│   ├── agents/              ← linked into ~/.claude/agents by sync.js (the agent team)
-│   ├── skills/ui-build/     ← linked into ~/.claude/skills/ui-build
-│   ├── skills/ci-watch/     ← linked into ~/.claude/skills/ci-watch
-│   ├── commands/*.md        ← linked into ~/.claude/commands/
-│   ├── statusline/          ← settings.json statusLine points here
-│   ├── hooks/               ← settings.json PostToolUse points here
-│   └── sync.js              ← SessionStart hook
-├── settings.json            ← template merged in (your own keys kept)
-├── CLAUDE.md                ← global/CLAUDE.md copied or appended
-└── claude-setup.local.json  ← per-machine opt-outs: { "skipMods": ["pb-light"] }
-```
-
-Every session, the `SessionStart` hook runs `sync.js`, which:
-
-1. writes every folder in `mods/` (minus `skipMods`) into `CLAUDE_CODE_PLUGIN_DIRS` in `settings.json`, with `CLAUDE_CODE_PLUGIN_DIR_WATCH=1`, so Desktop, VS Code and terminal sessions all load the mods from disk and hot-reload edits;
-2. keeps `.claude-plugin/marketplace.json` listing exactly the mods in `mods/`;
-3. installs + enables any `ALWAYS_ON` third-party plugins (none right now) and removes duplicate installed copies of local mods;
-4. re-enables any mod that a project's settings switch off;
-5. removes `disable-model-invocation: true` from every `~/.claude/skills/*/SKILL.md`, so Claude can always see and call every global skill (third-party updates can re-add it).
-
-Because skills and commands are links into the clone, `git pull` updates everything.
-
----
-
-## Mods (mine)
-
-Each folder has its own README with details.
-
-| Mod | What it does | Command |
-|---|---|---|
-| [claudelets-agent-monitor](mods/claudelets-agent-monitor/) | Live pane of the current request: % complete, tokens, and what each agent/subagent is doing, with a pixel Claude per agent dressed for its job | `/monitor` |
-| [unshipped-nag](mods/unshipped-nag/) | Toast when changes sit uncommitted 30+ min or commits are unpushed (max every 30 min) | – |
-| [lockstep-guards](mods/lockstep-guards/) | Flags `.env`/`.env.example` drift and schema/types/Zod changes made out of lockstep | – |
-| [bat-flyby](mods/bat-flyby/) | A Dracula bat flies across the band above the prompt when a `git push` succeeds | – |
-| [dracula-skin](mods/dracula-skin/) | Dracula look for Desktop + VS Code: turn dividers, tree-line tool rows with `[tags]`, session banner | – |
-| [pb-light](mods/pb-light/) | *Optional, off by default.* Status light: is live PocketBase in sync with the repo's `pb_schema.json` (read-only) | `/pb-light` |
-
-## Third-party plugins (installed by INSTALL.md, not copied here)
-
-| Plugin | Source | Why I use it |
-|---|---|---|
-| ponytail | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) | Always-on "lazy senior dev": smallest complete change; `ponytail-review` / `ponytail-audit` |
-| i-have-adhd | [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd) | Always-on output shaping: next action first, numbered steps, one concrete next step |
-| filetree | [data-goblin/claude-code-filetree](https://github.com/data-goblin/claude-code-filetree) | IDE-style file tree showing where Claude is working |
-| ui-ux-pro-max | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | Ships 7 design skills (below) as one plugin |
-
-## Skills
-
-### Mine
-
-| Skill | What it does |
+| Mod | What it does |
 |---|---|
-| [`/ui-build`](skills/ui-build/SKILL.md) | Runs the full UI stack in order: `ponytail` → `grill-me` → `ui-ux-pro-max` → `ui-styling` → `/ui-proto`. Use: `/ui-build <what UI to change>` |
-| [`ci-watch`](skills/ci-watch/SKILL.md) | Watches the GitHub Actions run for a commit pushed to `main` in the background. On failure: re-runs once if it's a flake, otherwise fixes, commits and pushes, at most 2 fix attempts, then asks. Never `--no-verify` or weakened checks. Started by the worktree hook; manual: `/ci-watch <sha>` |
+| [claudelets-agent-monitor](mods/claudelets-agent-monitor/) | Live pane of the current request: % complete, tokens, what each agent/subagent is doing (`/monitor`) |
+| [dracula-skin](mods/dracula-skin/) | Dracula look for Desktop + VS Code: turn dividers, tree-line tool rows with `[tags]`, session banner |
+| [lockstep-guards](mods/lockstep-guards/) | Flags `.env`/`.env.example` drift and schema/types/Zod changes made out of lockstep |
 
-### Third-party (installed by INSTALL.md from their source repos)
+Third-party mod (cloned, git-ignored): [filetree](https://github.com/data-goblin/claude-code-filetree).
 
-| Skill | Source | What it does |
-|---|---|---|
-| `grilling` | [mattpocock/skills](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling) | Relentless interview, in rounds, until a plan is fully decided |
-| `grill-me` | [mattpocock/skills](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me) | The `/grill-me` entry point to grilling |
-| `wayfinder` | [mattpocock/skills](https://github.com/mattpocock/skills/tree/main/skills/engineering/wayfinder) | Plans work too big for one session as decision tickets |
-| `research` | [mattpocock/skills](https://github.com/mattpocock/skills/tree/main/skills/engineering/research) | Researches primary sources into a Markdown file |
-| `prototype` | [mattpocock/skills](https://github.com/mattpocock/skills/tree/main/skills/engineering/prototype) | Throwaway prototype to answer a design question |
-| `tdd` | [mattpocock/skills](https://github.com/mattpocock/skills/tree/main/skills/engineering/tdd) | Red-green-refactor |
-| `diagnosing-bugs` | [mattpocock/skills](https://github.com/mattpocock/skills/tree/main/skills/engineering/diagnosing-bugs) | Diagnosis loop for hard bugs and perf regressions |
-| `code-review` | [mattpocock/skills](https://github.com/mattpocock/skills/tree/main/skills/engineering/code-review) | Standards + spec review of a branch |
-| `ui-ux-pro-max` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | UI/UX design intelligence: styles, palettes, fonts, UX rules |
-| `ui-styling`, `design`, `design-system`, `brand`, `banner-design`, `slides` | same plugin | shadcn/Tailwind styling, logos/CIP, tokens, brand voice, banners, HTML decks |
-| `browser-use` | [browser-use/browser-use](https://github.com/browser-use/browser-use/tree/main/skills/browser-use) | Browser automation CLI: verify UI, screenshots, flows |
-| `skin` | [basicScandal/claude-skins](https://github.com/basicScandal/claude-skins) | `/skin <name>`: themes, banners, personalities (+ my Windows patch) |
+### Agents
 
-### Most used (from my transcripts)
+`agents/` → `~/.claude/agents`: principal-engineer (main session playbook), ux-designer, frontend-engineer, backend-engineer, code-reviewer, qa-tester, researcher, docs-keeper, devops. Each keeps private memory in `~/.claude/agent-memory/<agent>/` (not in this repo). Hooks: `hooks/agent-learning-capture.js` (UserPromptSubmit) flags corrections; `hooks/agent-handback-gate.js` (SubagentStop) bounces a handback missing required lines. Test: `node hooks/agent-hooks.test.js`.
 
-1. `/commit` — by far the most used
-2. `grilling` / `/grill-me`
-3. `ui-ux-pro-max`
-4. `/ui-proto`
-5. `wayfinder`, `research`, `ponytail-review` / `ponytail-audit`, `/pb-drift`
+### Skills and commands (mine)
 
-## Agent team
-
-`agents/` is linked into `~/.claude/agents` by `sync.js` (a junction on Windows), so every session sees the team and every edit lands back in this repo.
-
-| Agent | Model | Does |
-|---|---|---|
-| [principal-engineer](agents/principal-engineer.md) | main session | Plans, delegates, relays agents' questions to you, loops QA feedback (2 rounds, then you), hands each agreed plan slice to a fresh session, runs the learning loop |
-| [ux-designer](agents/ux-designer.md) | Opus, medium | Options Artifact for every design decision, recommendations, "Copy my picks"; mocks only |
-| [frontend-engineer](agents/frontend-engineer.md) | Opus, medium | Builds the approved mock exactly + data, state, routing |
-| [backend-engineer](agents/backend-engineer.md) | Opus, medium | Everything that isn't frontend |
-| [code-reviewer](agents/code-reviewer.md) | Opus, medium | Read-only review of each diff before QA |
-| [qa-tester](agents/qa-tester.md) | Opus, medium | Quality gate, acceptance criteria in the running app, before/after screenshots; reports, never fixes |
-| [researcher](agents/researcher.md) | Haiku | Read-only fact finding with sources |
-| [docs-keeper](agents/docs-keeper.md) | Haiku | docs/, README, `.env`/`.env.example` parity |
-| [devops](agents/devops.md) | Haiku | Docker, CI, deploys, live DB; asks before anything production-facing |
-
-**How it learns:** each agent has `memory: user` (`~/.claude/agent-memory/<agent>/`, private, never in this repo). Corrections you make and each agent's `LEARNINGS:` line go there. At the end of a task the principal proposes rules that apply everywhere; the ones you approve are written into that agent's `## Learned rules` section here (and auto-pushed).
-
-**Hooks:** `hooks/agent-learning-capture.js` (UserPromptSubmit) flags prompts that read like corrections so the lesson gets saved; `hooks/agent-handback-gate.js` (SubagentStop) sends a team agent back once if its handback misses required lines (`GATE:`, `VERDICT:`, `LEARNINGS:`…). Test: `node hooks/agent-hooks.test.js`.
-
-**Use it:** the global CLAUDE.md tells the main session to act as principal for non-trivial work. Or run `claude --agent principal-engineer`, or name an agent ("use qa-tester on this").
-
-## Slash commands
-
-| Command | What it does |
+| | What it does |
 |---|---|
-| [`/commit [and push]`](commands/commit.md) | Reviews the diff, bumps the patch version in `package.json`, writes a `vX.Y.Z — intent` message, updates `CHANGELOG.md` (Keep a Changelog, plain language) and collapses the entry from 30 commits ago. Pushes only if asked. Never adds a Claude co-author. |
-| [`/self-review`](commands/self-review.md) | Harsh review of the latest work against correctness, completeness, the repo's own conventions and security; fixes what it finds, runs lint/typecheck/test/build, reports a table |
-| [`/ui-proto <change>`](commands/ui-proto.md) | Builds an Artifact with 2–3 switchable design options before any component code; implements the chosen one exactly |
-| [`/pb-drift`](commands/pb-drift.md) | *PocketBase only.* Read-only diff of live PocketBase vs `pb_schema.json` |
-| [`/pb-align`](commands/pb-align.md) | *PocketBase only.* Pushes `pb_schema.json` to live PocketBase (repo → live, destructive changes confirmed first). Run after a push to `release`; the worktree hook reminds you |
+| [`ui-build`](skills/ui-build/SKILL.md) | Full UI flow: grill → design guidance → Artifact options → build plan |
+| [`ci-watch`](skills/ci-watch/SKILL.md) | Watches GitHub Actions after a push to `main`; fixes failures (max 2 attempts) |
+| [`/commit`](commands/commit.md) | Reviews diff, bumps patch version, writes message + `CHANGELOG.md`; never a Claude co-author |
+| [`/self-review`](commands/self-review.md) | Harsh review of the latest work, fixes, runs the quality gate |
+| [`/ui`](commands/ui.md), [`/ui-proto`](commands/ui-proto.md) | UI options Artifact before any component code |
+| [`/pb-drift`](commands/pb-drift.md), [`/pb-align`](commands/pb-align.md) | PocketBase: read-only drift check / push `pb_schema.json` to live |
 
-## Global CLAUDE.md
+### Hooks and status line
 
-[`global/CLAUDE.md`](global/CLAUDE.md) is the rule set every session gets. Highlights:
+- [`hooks/worktree-merge-reminder.js`](hooks/worktree-merge-reminder.js) (PostToolUse): after a push to `main`, start `ci-watch` and clean merged worktrees; after a push to `release` with `pb_schema.json`, run `/pb-align`.
+- [`statusline/statusline.js`](statusline/statusline.js): model, branch + dirty count, context bar, coloured by the active skin.
 
-- Terse reporting; never add Claude as commit co-author.
-- `docs/` is the source of truth and is updated in the same change.
-- `.env` / `.env.example` stay structurally identical; schema, types and validation change together.
-- Quality gate (typecheck / lint / test / build) before "done".
-- Every question goes through `AskUserQuestion`.
-- UI work: prototype as an Artifact first, the approved mock is the spec, and every handback includes before/after screenshots (desktop + mobile) in an Artifact.
-- Optional blocks (mods, worktree cleanup, each always-on skill) are kept only if you install that part.
+### Third-party
 
-## Settings
-
-[`global/settings.template.json`](global/settings.template.json) is merged into `~/.claude/settings.json`; your existing keys win unless you agree to change them. It sets:
-
-- **`permissions.defaultMode: bypassPermissions`** — ⚠️ Claude runs tools without asking. This is how I work. INSTALL.md asks before applying it.
-- `effortLevel: medium`, `tui: fullscreen`, workflows on, push notifications on.
-- The `sync.js` SessionStart hook and the plugin marketplaces above.
-- Optional: status line, worktree hook, skin hooks, and (Windows) `CLAUDE_CODE_USE_POWERSHELL_TOOL=1`.
-
-## Status line
-
-[`statusline/statusline.js`](statusline/statusline.js): model, git branch with dirty-file count, and a context-remaining bar, all coloured by the active skin. Shows the pb-light result too when that mod is on.
-
-## Worktree merge reminder
-
-[`hooks/worktree-merge-reminder.js`](hooks/worktree-merge-reminder.js) — `PostToolUse` on Bash/PowerShell. After a `git push` that updates `main`, it tells Claude to run the `ci-watch` skill for the pushed SHA (repos with `.github/workflows/` only), and lists linked worktrees now fully merged and reminds Claude to remove them (see the worktree rules in `global/CLAUDE.md`). After a push to `release` in a repo with a `pb_schema.json`, it tells Claude to run `/pb-align`. Reminder only; it changes nothing.
-
-## Skins
-
-Installed from [basicScandal/claude-skins](https://github.com/basicScandal/claude-skins) (11 themes, default `dracula`). On Windows, [`skins/windows/apply.sh`](skins/windows/apply.sh) then:
-
-1. deletes skin output styles as plain files (Windows has no symlinks by default), and
-2. swaps in a `/skin` skill that runs the engine through `bash`.
-
-I don't use the upstream tool-sound hook or its status line; INSTALL.md removes them and keeps mine.
-
----
+Plugins (from `global/settings.json`): ponytail, i-have-adhd, hyperframes, rust-analyzer-lsp. Skills: see [`global/skills.json`](global/skills.json) (mostly [mattpocock/skills](https://github.com/mattpocock/skills), [ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill), [browser-use](https://github.com/browser-use/browser-use), [hyperframes](https://github.com/heygen-com/hyperframes)). Skins: [basicScandal/claude-skins](https://github.com/basicScandal/claude-skins) + [`skins/windows/apply.sh`](skins/windows/apply.sh). None of these are copied here.
 
 ## Requirements
 
-- Claude Code 2.1.296 or newer (tested on 2.1.296; mods need plugin hook modules and `CLAUDE_CODE_PLUGIN_DIRS`)
-- `git`, Node.js 18+ (`node` on PATH)
-- Windows: Git Bash (the skins engine and scripts are bash)
-- Optional: `uv` (for the `browser-use` CLI), `npx` (for third-party skills)
-
-## Update / uninstall
-
-```bash
-node ~/.claude/claude-setup/update.js
-```
-
-Pulls the latest and cleans up anything removed upstream (deleted mods, dead links, stale hooks). Start a new session after. More in [INSTALL.md → Update](INSTALL.md#update) and [INSTALL.md → Uninstall](INSTALL.md#uninstall).
+Claude Code 2.1.296+, `git`, Node.js 18+. Windows: Git Bash. `gh` for `ci-watch`.
 
 ## Licence
 
-My code: [MIT](LICENSE). Third-party plugins and skills are not in this repo; each keeps its own licence.
+My code: [MIT](LICENSE). Third-party plugins and skills keep their own licences.

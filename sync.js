@@ -1,7 +1,7 @@
 // SessionStart hook: every mod folder in mods/ is loaded straight from disk in
 // every session (CLAUDE_CODE_PLUGIN_DIRS, watched, so edits hot-reload everywhere) and
-// listed in the marketplace for others. Mods from other marketplaces in ALWAYS_ON are
-// installed at user scope and enabled. Silent when nothing changes.
+// listed in the marketplace. Plugins enabled in settings.json (mirrored from my other
+// devices by mirror.js) are installed if missing. Silent when nothing changes.
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
@@ -13,7 +13,7 @@ const SETTINGS = path.join(os.homedir(), '.claude', 'settings.json')
 const INSTALLED = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json')
 const readJson = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')) } catch { return fallback } }
 
-// per-machine opt-outs, e.g. { "skipMods": ["pb-light"] } (written by INSTALL.md, never committed)
+// per-machine opt-outs, e.g. { "skipMods": ["dracula-skin"] } (never committed)
 const skip = readJson(path.join(os.homedir(), '.claude', 'claude-setup.local.json'), {}).skipMods ?? []
 const all = fs.readdirSync(ROOT, { withFileTypes: true })
   .filter(d => d.isDirectory() && !d.name.startsWith('.'))
@@ -23,10 +23,12 @@ const mods = all.filter(m => !skip.includes(m.dir))
 // a mod with its own .git is someone else's (e.g. filetree): loaded, but not listed in this marketplace
 const own = all.filter(m => !fs.existsSync(path.join(ROOT, m.dir, '.git')))
 
-// third-party mods kept on everywhere, like the local ones
-const ALWAYS_ON = []
+// marketplace plugins enabled in settings.json get installed where missing
+const ALWAYS_ON = Object.entries(readJson(SETTINGS, {}).enabledPlugins ?? {})
+  .filter(([id, on]) => on === true && !/@(builtin|inline|claude-setup|local-mods)$/.test(id))
+  .map(([id]) => id)
 // plugin-dir mods are named <name>@inline; a project's enabledPlugins could still switch one off
-const ids = [...mods.map(m => `${m.manifest.name}@inline`), ...ALWAYS_ON]
+const ids = mods.map(m => `${m.manifest.name}@inline`)
 const localIds = mods.map(m => `${m.manifest.name}@claude-setup`)
 
 // 1. marketplace lists exactly the mods on disk
@@ -106,12 +108,14 @@ for (const d of fs.existsSync(SKILLS) ? fs.readdirSync(SKILLS) : []) {
   if (next !== text) fs.writeFileSync(f, next)
 }
 
-// 6. the agent team (agents/) is linked into ~/.claude/agents, so edits and learned rules
-// are live everywhere and land in this repo; an existing real folder is left alone
-const AGENTS = path.join(os.homedir(), '.claude', 'agents')
-const agentsSrc = path.join(__dirname, 'agents')
-let agentsLink = null
-try { agentsLink = fs.lstatSync(AGENTS) } catch {}
-if (!agentsLink && fs.existsSync(agentsSrc)) {
-  try { fs.symlinkSync(agentsSrc, AGENTS, 'junction') } catch {}
+// 6. agents/, commands/ and my own skills are linked into ~/.claude, so edits are live
+// everywhere and land in this repo; an existing real folder is left alone
+const links = ['agents', 'commands', ...fs.readdirSync(path.join(__dirname, 'skills')).map(s => path.join('skills', s))]
+for (const rel of links) {
+  const dest = path.join(os.homedir(), '.claude', rel)
+  let exists = false
+  try { fs.lstatSync(dest); exists = true } catch {}
+  if (!exists) {
+    try { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.symlinkSync(path.join(__dirname, rel), dest, 'junction') } catch {}
+  }
 }
