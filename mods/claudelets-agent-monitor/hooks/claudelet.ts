@@ -28,8 +28,6 @@ const bobble = (values: string, dur: string, begin: string, repeat = 'indefinite
 
 // Body sits at x 4..13, y 7..11; hats above it.
 const HATS: Record<string, string> = {
-  // crown
-  main: px(5, 4, 8, 2, '#F2C14E') + px(5, 3, 1, 1, '#F2C14E') + px(8, 3, 2, 1, '#F2C14E') + px(12, 3, 1, 1, '#F2C14E') + px(8, 4, 2, 1, '#E04F5F'),
   // pith helmet
   Explore: px(6, 4, 6, 2, '#CDB57E') + px(7, 3, 4, 1, '#CDB57E') + px(4, 6, 10, 1, '#A8925E'),
   // drafting cap + pencil behind the ear
@@ -42,8 +40,6 @@ const HATS: Record<string, string> = {
   claude: px(5, 5, 8, 2, '#C0392B') + px(6, 4, 5, 1, '#C0392B') + px(11, 4, 1, 1, '#8E2A20'),
   // visor + headset
   'statusline-setup': px(5, 6, 8, 1, '#2BB3A3') + px(12, 6, 3, 1, '#1E8076') + px(4, 5, 1, 3, '#444') + px(13, 5, 1, 3, '#444'),
-  // propeller beanie
-  fork: px(5, 5, 8, 2, '#E04F5F') + px(7, 5, 2, 2, '#F2C14E') + px(11, 5, 1, 2, '#3E6FB0') + px(8, 4, 2, 1, '#888') + px(6, 3, 6, 1, '#3E6FB0'),
   // party hat
   teammate: px(7, 5, 4, 2, '#B594F5') + px(8, 3, 2, 2, '#B594F5') + px(8, 2, 2, 1, '#F2C14E'),
   // the agent team (~/.claude/agents): captain's cap
@@ -112,7 +108,7 @@ export const hatFor = (role: string): string =>
   HATS[role] ?? (role.includes(':') ? beanie(role.split(':')[0]!) : HATS.other!)
 
 const ROLE_PROPS: Record<string, Prop> = {
-  main: 'todo', Explore: 'grep', Plan: 'edit', 'general-purpose': 'bash', 'claude-code-guide': 'read',
+  Explore: 'grep', Plan: 'edit', 'general-purpose': 'bash', 'claude-code-guide': 'read',
   'principal-engineer': 'todo', 'ux-designer': 'palette', 'frontend-engineer': 'laptop', 'backend-engineer': 'gear',
   'code-reviewer': 'grep', 'qa-tester': 'checklist', researcher: 'read', 'docs-keeper': 'quill', devops: 'wrench',
 }

@@ -62,7 +62,7 @@ test('tracks steps, tokens and subagents, and draws them in the pane', async ($,
       expect(sprites).toHaveLength(0)
     } else {
       expect(sprites.map(s => s.props.alt)).toEqual([
-        'main Claude thinking',
+        'principal-engineer Claude thinking',
         'Explore Claude working with Grep',
       ])
       expect(String(sprites[1]!.props.source)).toContain('#CDB57E') // Explore's pith helmet
@@ -102,11 +102,19 @@ test('claude-lets change pose as the agent thinks, finishes and errors', async (
     provider: { plugin: 'engine', tier: 'core' }, background: false, fork: false,
   } as Parameters<typeof $.agent.spawn>[0])
   await drain($.turn.step({ turnId: 't1', index: 0, model: 'm', messageCount: 1, agentId: 'sub-1' }))
-  expect(await alts()).toEqual(['main Claude working', 'Plan Claude thinking'])
+  expect(await alts()).toEqual(['principal-engineer Claude working', 'Plan Claude thinking'])
 
   await $.turn.complete({ answer: '', durationMs: 1, isAborted: false, turnId: 't1', agentId: 'sub-1', reason: 'error' } as never)
   await $.turn.complete({ answer: 'ok', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
-  expect(await alts()).toEqual(['main Claude done', 'Plan Claude stopped on an error'])
+  expect(await alts()).toEqual(['principal-engineer Claude done', 'Plan Claude stopped on an error'])
+
+  // A fork shows under its parent's name, not "fork".
+  await $.turn.start({ text: 'again', turnId: 't2' })
+  await $.agent.spawn({
+    tool_use_id: 'tu2', prompt: 'p', description: 'Side task', subagentType: 'fork',
+    provider: { plugin: 'engine', tier: 'core' }, background: false, fork: true,
+  } as Parameters<typeof $.agent.spawn>[0])
+  expect((await alts()).map(a => String(a).split(' Claude')[0])).toEqual(['principal-engineer', 'principal-engineer'])
 })
 
 test('tool calls read as tiny plain-English lines', () => {
@@ -224,10 +232,10 @@ test('a claude-let raises its hand while a question or permission prompt is open
   on('tool.check', () => ({ decision: 'ask' as const }))
   await $.turn.start({ text: 'go', turnId: 't1' })
   await $.tool.call({ tool: 'AskUserQuestion', questions: [] } as never)
-  expect(seen).toEqual(['main Claude waiting on you'])
-  expect(await alts()).toEqual(['main Claude working with AskUserQuestion'])
+  expect(seen).toEqual(['principal-engineer Claude waiting on you'])
+  expect(await alts()).toEqual(['principal-engineer Claude working with AskUserQuestion'])
   await $.tool.check({ tool: 'Bash', input: { command: 'rm x' }, tool_use_id: 'tu9' } as never)
-  expect(await alts()).toEqual(['main Claude waiting on you'])
+  expect(await alts()).toEqual(['principal-engineer Claude waiting on you'])
 })
 
 test('no approve toast when the mode never prompts (bypass)', async ($, on) => {

@@ -6,6 +6,8 @@ import { maskPrivate } from './privacy'
 
 const PANE = 'agent-monitor'
 const MAIN = 'main'
+/** The main session runs as the principal engineer (see ~/.claude/CLAUDE.md "Agent team"). */
+const MAIN_NAME = 'principal-engineer'
 const EMPTY: Run = { order: [], agents: {} }
 
 const RUN = { plugin: 'claudelets-agent-monitor', key: 'run' } as const
@@ -574,7 +576,7 @@ export const register: Register = (on, options) => {
   on('turn.start', async ($, e, next) => {
     const latest = await updateRun($, r => {
       const carried = r.order.filter(id => id !== MAIN && r.agents[id] && !r.agents[id].isDone)
-      const agents: Record<string, AgentRow> = { [MAIN]: newRow(MAIN, 'main', maskPrivate(e.text).slice(0, 80)) }
+      const agents: Record<string, AgentRow> = { [MAIN]: newRow(MAIN, MAIN_NAME, maskPrivate(e.text).slice(0, 80)) }
       for (const id of carried) agents[id] = r.agents[id]!
 
       return { order: [MAIN, ...carried], agents }
@@ -597,15 +599,17 @@ export const register: Register = (on, options) => {
     const latest = await updateRun($, r => {
       if (!r.agents[MAIN]) return r
       const parentId = e.parentAgentId && r.agents[e.parentAgentId] ? e.parentAgentId : MAIN
+      // A fork is a copy of its parent: show it under the parent's name, not "fork".
+      const name = e.fork ? r.agents[parentId]!.name : e.subagentType
 
       return {
         order: [...r.order, id],
-        agents: { ...r.agents, [id]: { ...newRow(id, e.subagentType, maskPrivate(e.description), parentId), model: spawned.model } },
+        agents: { ...r.agents, [id]: { ...newRow(id, name, maskPrivate(e.description), parentId), model: spawned.model } },
       }
     })
     if (latest.agents[id]) $.ui.status(summary(latest))
     startTicker($)
-    await markUsed($, e.subagentType).catch(() => undefined)
+    if (!e.fork) await markUsed($, e.subagentType).catch(() => undefined)
 
     return spawned
   })
