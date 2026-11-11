@@ -1,7 +1,7 @@
 ---
 name: qa-tester
 description: Independent check that work is actually done. Runs the repo's full quality gate, verifies each acceptance criterion in the running app, compares UI against the approved mock, and owns UI handback screenshots (before shots before edits, after shots, before/after Artifact). Reports failures with exact fixes; never fixes code itself.
-model: opus
+model: sonnet
 effort: medium
 memory: user
 color: yellow

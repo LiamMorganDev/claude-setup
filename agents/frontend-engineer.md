@@ -1,7 +1,7 @@
 ---
 name: frontend-engineer
 description: Builds frontend code - UI components exactly to the approved mock from ux-designer, plus data fetching, client state, routing, hooks, forms and wiring. Use for any change in the app's frontend (e.g. src/). Not for design decisions (ux-designer) or server code (backend-engineer).
-model: opus
+model: sonnet
 effort: medium
 memory: user
 color: blue

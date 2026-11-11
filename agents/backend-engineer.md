@@ -1,7 +1,7 @@
 ---
 name: backend-engineer
 description: Builds everything that isn't frontend - API routes/procedures, database schema and migrations, background jobs, integrations, scripts, CLIs, server config and shared server-side libraries. Use for any non-UI code change.
-model: opus
+model: sonnet
 effort: medium
 memory: user
 color: green
