@@ -1,6 +1,6 @@
 // PostToolUse(Bash) hook:
-// - after a `git push` that updates `release` in a repo with a pb_schema.json, remind Claude to run /pb-align
-//   (align live PocketBase to the release schema);
+// - after a `git push` that updates `release` in a repo with a pb_schema.json, remind Claude to tell the user
+//   to sync live PocketBase from the app after the deploy;
 // - after a `git push` that updates main,
 //   1. if the repo has GitHub Actions workflows, tell Claude to run the ci-watch skill for the pushed SHA;
 //   2. list linked worktrees whose branch is now fully merged into main, and remind Claude to follow the global
@@ -40,10 +40,10 @@ process.stdin.on('end', () => {
     };
 
     const msgs = [];
-    // Live PocketBase follows production: align it on a release push, never on a main push.
+    // Live PocketBase follows production: synced from the app after a release, never by Claude.
     if (names('release') && existsSync(join(git('rev-parse', '--show-toplevel'), 'pb_schema.json')))
       msgs.push(
-        "Pushed to release. Run /pb-align now: align live PocketBase to the release branch's pb_schema.json (repo → live; confirm destructive changes first).",
+        "Pushed to release. Don't align live PocketBase from here: tell the user to sync it after the deploy from the app's schema screen (e.g. Settings → System → Database schema).",
       );
     if (!names('main')) return emit(msgs);
 
@@ -80,7 +80,7 @@ process.stdin.on('end', () => {
     if (merged.length)
       msgs.push(
         `Pushed to main. These worktrees are now fully merged into origin/main: ${merged.join(', ')}. ` +
-          `Follow the global CLAUDE.md "Worktree merged into main" rule: remove each worktree (unlink any node_modules junction first) and its branch. Don't align live PocketBase now; that happens on a release push (/pb-align).`,
+          `Follow the global CLAUDE.md "Worktree merged into main" rule: remove each worktree (unlink any node_modules junction first) and its branch. Don't align live PocketBase; it is synced from the app after a release.`,
       );
     emit(msgs);
   } catch {

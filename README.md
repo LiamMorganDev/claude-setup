@@ -59,11 +59,10 @@ Third-party mod (cloned, git-ignored): [filetree](https://github.com/data-goblin
 | [`/commit`](commands/commit.md) | Reviews diff, bumps patch version, writes message + `CHANGELOG.md`; never a Claude co-author |
 | [`/self-review`](commands/self-review.md) | Harsh review of the latest work, fixes, runs the quality gate |
 | [`/ui`](commands/ui.md), [`/ui-proto`](commands/ui-proto.md) | UI options Artifact before any component code |
-| [`/pb-drift`](commands/pb-drift.md), [`/pb-align`](commands/pb-align.md) | PocketBase: read-only drift check / push `pb_schema.json` to live |
 
 ### Hooks and status line
 
-- [`hooks/worktree-merge-reminder.js`](hooks/worktree-merge-reminder.js) (PostToolUse): after a push to `main`, start `ci-watch` and clean merged worktrees; after a push to `release` with `pb_schema.json`, run `/pb-align`.
+- [`hooks/worktree-merge-reminder.js`](hooks/worktree-merge-reminder.js) (PostToolUse): after a push to `main`, start `ci-watch` and clean merged worktrees; after a push to `release` with `pb_schema.json`, remind to sync live PocketBase from the app.
 - [`statusline/statusline.js`](statusline/statusline.js): model, branch + dirty count, context bar, coloured by the active skin.
 
 ### Third-party

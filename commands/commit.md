@@ -7,7 +7,7 @@ Run the following git commands to understand all current changes:
 If there is nothing to commit (clean tree, nothing staged), say so, and stop — never create an empty commit or a version bump.
 
 Then:
-0. **Never align live PocketBase here.** That happens after a push to `release` (`/pb-align`), not on commit or a push to `main`.
+0. **Never align live PocketBase here.** Live schema is synced from the app after a release, never from a session.
 1. Check whether `package.json` has been modified since the last push by running `git diff origin/$(git rev-parse --abbrev-ref HEAD) -- package.json`. If the version field has NOT changed (or package.json is unchanged), bump the version in `package.json` now before committing, choosing the level from what the change does:
    - **Patch** (`1.0.0` → `1.0.1`) — small changes: bug fixes, tweaks, copy/styling, refactors, docs, tooling, small improvements to an existing feature.
    - **Minor** (`1.0.1` → `1.1.0`) — a new feature: a new page, screen, workflow, integration or capability the user can now do that they couldn't before. If unsure whether it counts as a new feature (vs. patch), ask the user (AskUserQuestion) before bumping.
