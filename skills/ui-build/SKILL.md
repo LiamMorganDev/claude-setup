@@ -25,7 +25,7 @@ Invoke each of these with the Skill tool, in this order, passing the task as `ar
 
 ## Prototype mode: in-app first, Artifact fallback
 
-If the repo has an in-app prototypes area — a `docs/PROTOTYPES.md` (read it fully; it is the source of truth for how prototypes are built there) — use **in-app mode**. Otherwise use **Artifact mode**.
+If the repo has an in-app prototypes area — a `docs/PROTOTYPES.md` (read it fully; it is the source of truth for how prototypes are built there) — **always** use **in-app mode**, never an Artifact (not even a quick one "to start with"). Use **Artifact mode** only when the repo has no `docs/PROTOTYPES.md`.
 
 ### In-app prototypes
 
@@ -36,6 +36,7 @@ The options are built inside the real app, with real data and the app's own comp
 - Prototypes never change live data (the repo's prototype mode blocks writes) and always show the "Prototype, live data unaffected" notice. Links to non-prototyped pages open the real page in a new tab.
 - Because this needs code, the flow is: grill → write a **prototype build plan** (decisions, options, data states, files, per `docs/PROTOTYPES.md`) → start it in a new session (see "Optional: start it in a new session") → I review the prototype and send back the picks URL → the agreement gate → a **promotion build plan** that moves the picked options into the real pages and archives the prototype.
 - In the agreement gate, the prototype URL with my picks replaces the "final mock" Artifact as the spec.
+- **Always give me the link.** Every time you ask me about picks or the prototype (each AskUserQuestion, the agreement gate, the handback), include the clickable prototype page URL with the current/default picks in the query (e.g. `<app URL>/admin/prototypes/<slug>?layout=b&…`; the local dev URL while it isn't deployed, plus the live URL once it is), in the question text itself so I can open it from the dialog.
 
 ## Design decisions: lots of them, with 4+ options each
 
@@ -44,7 +45,7 @@ I want to make many of the design decisions myself, visually. So:
 - Break the UI into **separate design decisions** (e.g. overall layout, navigation, card vs list vs table, density, hierarchy/emphasis, colour/accent use, typography, empty/loading/error states, mobile layout, key interactions, copy tone). Surface every decision that a reasonable designer could go more than one way on — more is better than fewer.
 - For **each decision, show 4 or more clearly different options** where the decision allows it (minimum 2 only when there genuinely aren't more sensible ones). Name each option and give it a one-line trade-off. Mark your recommendation.
 - Show them **in the prototype (in-app or Artifact)**, not in chat text: one section (or tab) per decision, options side by side / switchable, with realistic content matching the real app. Ideally let me mix and match (pick per decision) and see the combined result. **Controls never push the preview off-screen:** on desktop put the option controls in a sticky side panel (own scroll) next to the preview; on phones a collapsible bottom sheet; status/variant switchers sit right above the preview. Picking an option must show its effect without scrolling. An option that only shows in one state (e.g. a status, a guest view) switches the preview to that state when picked, and its label says so. **Every pick shows what it changed:** it puts the preview into the state that displays that decision (page/view, desktop/phone, data/fill state, wizard step, open dialog or row), outlines every area the decision affects with a labelled blue dashed box (e.g. "4. Progress position: B"), shows a one-line "decision → option · showing <state>" strip above the preview, and reveals the first affected area without jarring: scroll only the preview frame (never the outer page), only when the area is out of view, by the smallest distance that clears sticky bars and the label; jump instantly when the pick switched view/screen/step/state, scroll smoothly otherwise (instant under reduced motion); a single quick outline fade-in, no pulsing (tag preview elements with the decision ids they render). Include a "Copy my picks" button that copies decision → chosen option (letter + name) as plain text to paste into chat (clipboard, with select-text fallback).
-- Then ask me with AskUserQuestion which option to take for each decision (up to 4 questions per call; repeat calls for more decisions). Rebuild/refine the Artifact with my picks if I ask.
+- Then ask me with AskUserQuestion which option to take for each decision (up to 4 questions per call; repeat calls for more decisions). In in-app mode each question includes the prototype page link (see "In-app prototypes"). Rebuild/refine the prototype with my picks if I ask.
 
 ## Agreement gate
 
