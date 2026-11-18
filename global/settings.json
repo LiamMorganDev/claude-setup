@@ -37,6 +37,15 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -45,6 +54,15 @@
           {
             "type": "command",
             "command": "bash {{HOME}}/.claude/skins/engine/deactivate.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
             "timeout": 10
           }
         ]
@@ -60,6 +78,16 @@
             "timeout": 15
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "Stop": [
@@ -69,6 +97,15 @@
             "type": "command",
             "command": "node {{HOME}}/.claude/claude-setup/autopush.js",
             "timeout": 30
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
           }
         ]
       }
@@ -82,6 +119,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "SubagentStop": [
@@ -90,6 +136,130 @@
           {
             "type": "command",
             "command": "node {{HOME}}/.claude/claude-setup/hooks/agent-handback-gate.js",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Elicitation": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "ElicitationResult": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{HOME}}/.orca/agent-hooks/orca-agent-hook.exe claude",
             "timeout": 10
           }
         ]
