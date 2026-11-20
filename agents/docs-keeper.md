@@ -31,4 +31,4 @@ LEARNINGS: <or none>
 
 ## Learned rules
 
-_None yet. The principal adds approved rules here._
+- Before handback, grep the code for `docs/` references and check every linked file and heading exists; keep referenced headings stable.

@@ -44,4 +44,4 @@ LEARNINGS: <or none>
 
 ## Learned rules
 
-_None yet. The principal adds approved rules here._
+- Dry-run Linux deploy scripts on Windows inside a `docker:cli` container (socket mounted) against a local `registry:2` on `localhost:5000`. For git-archive release scripts and uncommitted work, build a temp commit with `GIT_INDEX_FILE` + `write-tree` + `commit-tree` (no ref moved, no stash).

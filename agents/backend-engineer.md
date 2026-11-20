@@ -41,4 +41,4 @@ LEARNINGS: <or none>
 
 ## Learned rules
 
-_None yet. The principal adds approved rules here._
+- Under Bun, install git hooks with a `"prepare": "lefthook install"` script (trustedDependencies alone is not enough) and verify the hook files exist. In a git worktree never run `lefthook uninstall`: the hooks dir is shared with the main checkout.

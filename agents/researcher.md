@@ -29,4 +29,4 @@ LEARNINGS: <or none>
 
 ## Learned rules
 
-_None yet. The principal adds approved rules here._
+- For age-gated version pins, take the newest release dated on or before the cutoff (GitHub releases API or npm `time`), not npm `latest`; flag boundary-date picks with a strict alternative.
